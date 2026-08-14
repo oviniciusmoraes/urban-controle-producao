@@ -166,6 +166,12 @@ small.hint{display:block;color:var(--muted);font-size:11px;margin-top:3px}
 .splitnote{font-size:12px;color:var(--muted)}
 td.savail{font-weight:800;background:#f1f5ff}
 td.cmcell{font-weight:700}
+.chkdet{display:inline-flex;align-items:center;gap:7px;font-weight:600;font-size:12.5px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:7px 12px;cursor:pointer;box-shadow:var(--shadow)}
+.chkdet input{cursor:pointer}
+.srcline{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;font-size:11px}
+.srcpill{padding:2px 8px;border-radius:999px;font-weight:700}
+.srcpill.ok{background:#dcfce7;color:#15803d}
+.srcpill.bad{background:#fee2e2;color:#b91c1c}
 td.nobrk{color:#c2c8d0}
 /* expandir detalhe por canal */
 td.exptog{cursor:pointer;color:#2563eb;font-weight:900;text-align:center;width:26px;user-select:none}
@@ -226,6 +232,7 @@ tr.egrouphead th.ch-ml{background:#5a4310}
         <option value="ALERTA">Só ALERTA</option>
         <option value="OK">Só OK</option>
       </select>
+      <label class="chkdet"><input type="checkbox" id="detView"> Mostrar visão detalhada por depósito</label>
       <button class="btn ghost" id="applyAllSug" title="Define o crescimento sugerido como padrão de todos os produtos">✨ Aplicar todas as sugestões</button>
     </div>
     <div class="legend">
@@ -490,7 +497,7 @@ function compute(d){
 }
 
 // ---------- Render Visão Geral ----------
-const COLS = [
+const COLS_BASE = [
   {k:"sku",t:"SKU",l:true},
   {k:"savail",t:"Estoque total"},
   {k:"cmensal",t:"Consumo mensal"},
@@ -498,6 +505,23 @@ const COLS = [
   {k:"dias",t:"Esgota em (dias)"},
   {k:"sit",t:"Situação",l:true}
 ];
+const COLS_DET = [
+  {k:"sku",t:"SKU",l:true},
+  {k:"savail",t:"Estoque total"},
+  {k:"dom",t:"Est. Domuslog"},
+  {k:"shopee",t:"Est. Full Shopee"},
+  {k:"ml",t:"Est. Full ML"},
+  {k:"transito",t:"Est. Em trânsito"},
+  {k:"cmensal",t:"Consumo total"},
+  {k:"cmDomus",t:"Cons. Domuslog"},
+  {k:"cmShopee",t:"Cons. Shopee"},
+  {k:"cmMl",t:"Cons. Full ML"},
+  {k:"formato",t:"Grade atual"},
+  {k:"dias",t:"Esgota (dias)"},
+  {k:"sit",t:"Situação",l:true}
+];
+let COLS = COLS_BASE;
+function sizeOf(sku){ const m=String(sku).match(/(\d+)\s*$/); return m?parseInt(m[1],10):99999; }
 
 function rowsComputed(){
   return DATA.map(d=>({...d, ...compute(d)}));
@@ -562,13 +586,14 @@ function detailHTML(r){
 }
 
 function renderTable(){
+  COLS = (document.getElementById("detView") && document.getElementById("detView").checked) ? COLS_DET : COLS_BASE;
   let rows = rowsComputed();
   const q=document.getElementById("q").value.trim().toLowerCase();
   const fs=document.getElementById("fStatus").value;
   const filt=(r)=>(!q||r.sku.toLowerCase().includes(q)||r.fam.toLowerCase().includes(q))&&(!fs||r.sit===fs);
 
-  // head (coluna extra para o expandir)
-  document.getElementById("thead").innerHTML = `<th></th>`+COLS.map(c=>`<th class="${c.l?'l':''}" data-k="${c.k}">${c.t}</th>`).join("");
+  // head
+  document.getElementById("thead").innerHTML = COLS.map(c=>`<th class="${c.l?'l':''}" data-k="${c.k}">${c.t}</th>`).join("");
 
   const tb=document.getElementById("tbody"); tb.innerHTML="";
 
@@ -586,12 +611,7 @@ function renderTable(){
       if(c.k==="cmensal") return `<td class="cmcell">${fmt(v)}</td>`;
       return `<td class="${c.l?'l':''}">${fmt(v)}</td>`;
     }).join("");
-    const tr=document.createElement("tr");
-    tr.innerHTML=`<td class="exptog" data-sku="${r.sku}" title="Ver estoque e consumo por canal">▸</td>`+tds;
-    tb.appendChild(tr);
-    const dr=document.createElement("tr"); dr.className="detrow"; dr.dataset.for=r.sku;
-    dr.innerHTML=`<td colspan="${COLS.length+1}">${detailHTML(r)}</td>`;
-    tb.appendChild(dr);
+    const tr=document.createElement("tr"); tr.innerHTML=tds; tb.appendChild(tr);
   };
 
   // Ordem de produtos: famílias-semente primeiro, depois quaisquer produtos colados
@@ -606,6 +626,7 @@ function renderTable(){
     const undM=fr.reduce((s,r)=>s+r.cmensal,0);
     fr=fr.filter(filt);
     if(sortKey) fr.sort((a,b)=>{let x=a[sortKey],y=b[sortKey];if(x==null)x=-1;if(y==null)y=-1;return (typeof x==="string")?x.localeCompare(y)*sortDir:(x-y)*sortDir;});
+    else fr.sort((a,b)=>sizeOf(a.sku)-sizeOf(b.sku)); // ordem por tamanho 36→52
     if(!fr.length) return;
 
     const undS=Math.round(undM/30*7);
@@ -616,7 +637,7 @@ function renderTable(){
     const sugMatch=Math.abs(sug.g-cfg.cresc)<1e-9;
 
     const ftr=document.createElement("tr"); ftr.className="fam-row";
-    ftr.innerHTML=`<td colspan="${COLS.length+1}" style="border-left:6px solid ${cfg.hex}">
+    ftr.innerHTML=`<td colspan="${COLS.length}" style="border-left:6px solid ${cfg.hex}">
       <div class="fam-head">
         <input type="color" class="sw" data-fam="${fam}" data-act="hex" value="${cfg.hex}" title="Cor do produto">
         <input type="text" class="corname" data-fam="${fam}" data-act="cor" value="${cfg.cor||''}" placeholder="cor…" title="Cadastro da cor">
@@ -755,12 +776,7 @@ document.getElementById("thead").addEventListener("click",e=>{
   if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir=1;}
   renderTable();
 });
-// expandir/recolher detalhe por canal
-document.getElementById("tbody").addEventListener("click",e=>{
-  const t=e.target.closest(".exptog"); if(!t) return;
-  const dr=t.closest("tr").nextElementSibling;
-  if(dr&&dr.classList.contains("detrow")){ const open=dr.classList.toggle("open"); t.textContent=open?"▾":"▸"; }
-});
+document.getElementById("detView").addEventListener("change",renderTable);
 
 // ---------- Persistência (opcional) ----------
 const SEED_VERSION=3; // muda quando o seed de famílias é atualizado (invalida estado salvo antigo)
@@ -1083,7 +1099,16 @@ async function loadFromDrive(silent){
     if(!j.data||!j.data.length)throw new Error('a função respondeu, mas a pasta não retornou dados (confira o compartilhamento da pasta e os arquivos).');
     applyStockData(j.data);
     const when=j.updated?new Date(j.updated).toLocaleString('pt-BR'):'agora';
-    if(st){st.className='impst ok';st.textContent='✓ '+j.data.length+' SKUs · atualizado '+when;}
+    if(st){
+      st.className='impst ok';
+      let src='';
+      if(j.sources){
+        const map={domus:'Domuslog',shopee:'Full Shopee',ml:'Full ML',saidas:'Saídas',prod:'Produção'};
+        src='<div class="srcline">'+Object.keys(map).map(k=>{const n=j.sources[k]||0;return `<span class="srcpill ${n>0?'ok':'bad'}">${map[k]}: ${n}${n>0?'':' ⚠️'}</span>`;}).join('')+'</div>';
+      }
+      st.innerHTML='✓ '+j.data.length+' SKUs · atualizado '+when+src+
+        (j.sources&&!j.sources.ml?'<div class="note" style="color:#b45309;margin-top:4px">Full ML veio 0 — suba o relatório do Mercado Livre <b>convertido para Planilhas Google</b> (o .xlsx do ML não é lido direto).</div>':'');
+    }
     const badge=document.getElementById('driveBadge');
     if(badge){badge.style.display='inline-flex';badge.textContent='● Visão real · '+when;}
     if(!silent){document.getElementById('impResumo').textContent='Visão real carregada do Drive ('+j.data.length+' SKUs).';go('visao');}
