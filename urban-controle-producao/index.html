@@ -1,0 +1,1128 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Urban Zone — Painel de Estoque</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  color-scheme: light;
+  --bg:#eef1f6; --card:#ffffff; --ink:#0f172a; --muted:#64748b; --line:#e2e8f0;
+  --brand:#0b1220; --accent:#2563eb; --accent2:#06b6d4;
+  --grad:linear-gradient(135deg,#2563eb,#06b6d4);
+  --ok-bg:#dcfce7; --ok-ink:#15803d;
+  --al-bg:#fef3c7; --al-ink:#b45309;
+  --va-bg:#fee2e2; --va-ink:#b91c1c;
+  --shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px rgba(15,23,42,.06);
+}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);font:14px/1.5 "Inter",system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  background:
+    radial-gradient(1100px 500px at 12% -10%, rgba(37,99,235,.10), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(6,182,212,.10), transparent 55%),
+    var(--bg);}
+.wrap{max-width:1240px;margin:0 auto;padding:18px}
+header.app{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:16px;
+  background:linear-gradient(120deg,#0b1220 0%,#111c33 55%,#0b2236 100%);
+  color:#fff;border-radius:18px;padding:18px 22px;position:relative;overflow:hidden;
+  box-shadow:0 12px 30px rgba(8,15,35,.28)}
+header.app::after{content:"";position:absolute;inset:0;background-image:
+  linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);
+  background-size:28px 28px;mask-image:linear-gradient(90deg,transparent,#000 30%,#000 70%,transparent);pointer-events:none}
+.brand{flex:none;z-index:1}
+.logo-svg{display:block;height:54px;width:auto;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4))}
+.brand-txt{z-index:1}
+h1{font-size:20px;margin:0;letter-spacing:.2px;font-weight:800}
+.sub{color:#9fb3d1;font-size:12.5px;margin-top:3px}
+.headstat{margin-left:auto;display:flex;gap:18px;z-index:1;flex-wrap:wrap}
+.headstat .hs{text-align:right}
+.headstat .hs .n{font-size:20px;font-weight:800;line-height:1;background:linear-gradient(135deg,#7dd3fc,#a5b4fc);-webkit-background-clip:text;background-clip:text;color:transparent}
+.headstat .hs .l{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#8aa0c0;margin-top:3px}
+.drivebadge{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;font-weight:700;color:#a7f3d0;background:rgba(16,185,129,.14);border:1px solid rgba(16,185,129,.35);padding:3px 10px;border-radius:999px}
+.tabs{display:flex;gap:7px;flex-wrap:wrap;margin:6px 0 18px}
+.tab{padding:9px 16px;border:1px solid var(--line);background:#fff;border-radius:12px;cursor:pointer;font-weight:600;color:var(--muted);transition:.15s;box-shadow:var(--shadow)}
+.tab:hover{color:var(--ink);transform:translateY(-1px)}
+.tab.active{background:var(--brand);color:#fff;border-color:transparent;box-shadow:0 6px 16px rgba(11,18,32,.28)}
+.panel{display:none}
+.panel.active{display:block}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--grad)}
+.kpi .n{font-size:24px;font-weight:800;letter-spacing:-.5px}
+.kpi .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+.kpi.va::before{background:linear-gradient(#ef4444,#b91c1c)} .kpi.va .n{color:var(--va-ink)}
+.kpi.al::before{background:linear-gradient(#f59e0b,#b45309)} .kpi.al .n{color:var(--al-ink)}
+.kpi.ok::before{background:linear-gradient(#22c55e,#15803d)} .kpi.ok .n{color:var(--ok-ink)}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+input[type=search],select,input[type=number]{padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;font:inherit}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 9px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child,th.l,td.l{text-align:left}
+thead th{position:sticky;top:0;background:#0f1b30;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:#cbd5e1;cursor:pointer;user-select:none;font-weight:700;z-index:2}
+thead th:hover{color:#fff}
+tbody tr:hover{background:#f9fafb}
+.fam-row td{background:#eef2ff;text-align:left;font-size:12px;padding:8px 10px}
+.fam-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fam-head .sw{width:26px;height:26px;padding:0;border:1px solid #cbd5e1;border-radius:6px;background:none;cursor:pointer}
+.fam-head .corname{width:120px;padding:4px 8px;border:1px solid #cbd5e1;border-radius:7px;font-weight:600;font-size:12px}
+.fam-head .fam-name{font-weight:800;color:#3730a3;letter-spacing:.3px}
+.fam-head .grow{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:#374151;background:#fff;border:1px solid var(--line);border-radius:8px;padding:3px 8px}
+.fam-head .grin{width:56px;padding:3px 6px;border:1px solid #cbd5e1;border-radius:6px;font-weight:700;text-align:right}
+.sugbtn{border:1px dashed #93c5fd;background:#eff6ff;color:#1d4ed8;border-radius:999px;padding:3px 10px;font-weight:700;font-size:11px;cursor:pointer}
+.sugbtn.on{border-style:solid;border-color:#16a34a;background:#dcfce7;color:#15803d}
+.fam-head .fam-stats{margin-left:auto;color:#475569;font-weight:600;font-size:11px}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-weight:700;font-size:11px}
+.s-OK{background:var(--ok-bg);color:var(--ok-ink)}
+.s-ALERTA{background:var(--al-bg);color:var(--al-ink)}
+.s-VAIACABAR{background:var(--va-bg);color:var(--va-ink)}
+.neg{color:#b91c1c}.pos{color:#15803d}
+.env-off{background:#eceef1;color:#c2c8d0}
+.env-send{background:#fff7ed;color:#b45309;font-weight:800}
+.envpill{display:inline-block;padding:2px 10px;border-radius:6px;font-weight:800;font-size:11px;color:#fff}
+.envpill.env-ideal{background:#16a34a}
+.envpill.env-poss{background:#dc2626}
+.gradebar{position:relative;display:flex;align-items:center;min-width:120px;height:18px}
+.gradebar i{display:block;height:13px;background:#111827;border-radius:2px}
+.gradebar b{position:absolute;right:4px;font-size:11px;color:#374151}
+.scroll{max-height:70vh;overflow:auto}
+textarea{width:100%;min-height:200px;border:1px solid var(--line);border-radius:10px;padding:10px;font:13px/1.4 ui-monospace,Menlo,Consolas,monospace;background:#fff}
+.btn{padding:9px 16px;border:0;background:var(--grad);color:#fff;border-radius:10px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.28);transition:.15s}
+.btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(37,99,235,.36)}
+.btn.ghost{background:#fff;color:var(--accent);border:1px solid var(--line);box-shadow:var(--shadow)}
+.btn.ghost:hover{box-shadow:0 4px 12px rgba(15,23,42,.1)}
+.note{font-size:12px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:760px){.grid2{grid-template-columns:1fr}}
+.fbox{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:12px;box-shadow:var(--shadow)}
+.fbox h3{margin:0 0 6px;font-size:14px}
+.imp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.impcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow);transition:.15s}
+.impcard:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(15,23,42,.1)}
+.impcard .impt{font-weight:800;margin-bottom:6px}
+.impcard input[type=file]{margin-top:10px;font-size:12px;width:100%}
+.impcard .impst{margin-top:8px;font-size:12px;font-weight:700;min-height:16px}
+.impst.ok{color:#15803d}.impst.err{color:#b91c1c}
+.fbox code{background:#f3f4f6;padding:2px 6px;border-radius:6px;font-size:12px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:6px 0 0}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.dot{width:10px;height:10px;border-radius:50%}
+.config-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.config-row label{min-width:230px;font-weight:600}
+/* Produção */
+.funnel-row{display:flex;align-items:center;gap:10px;margin:5px 0}
+.funnel-row .fl-name{width:200px;font-size:12px;font-weight:600;color:#374151;text-align:right;flex:none}
+.funnel-row .fl-track{flex:1;background:#f1f5f9;border-radius:6px;overflow:hidden;height:22px}
+.funnel-row .fl-bar{height:100%;background:linear-gradient(90deg,#2563eb,#60a5fa);border-radius:6px;min-width:2px}
+.funnel-row .fl-val{width:70px;font-weight:800;font-size:12px;color:#1d4ed8;flex:none}
+.funnel-row .fl-avg{width:74px;font-weight:700;font-size:12px;color:#64748b;flex:none}
+.funnel-row .fl-avg.slow{color:#b91c1c}
+.pcell{cursor:default}
+.pcell.has{font-weight:700;color:#1d4ed8;background:#eff6ff;cursor:help}
+.pcell.has:hover{background:#dbeafe}
+.ptip{position:fixed;z-index:50;background:#0f172a;color:#fff;border-radius:8px;padding:8px 10px;font-size:12px;max-width:300px;box-shadow:0 8px 24px rgba(0,0,0,.25);pointer-events:none;display:none}
+.ptip b{color:#93c5fd}
+.ptip .ln{display:flex;justify-content:space-between;gap:14px;padding:1px 0}
+.pfam td{background:#eef2ff;font-weight:800;color:#3730a3;font-size:12px}
+.pminibar{display:inline-flex;height:9px;border-radius:5px;overflow:hidden;vertical-align:middle;margin-left:8px;width:160px;border:1px solid #c7d2fe}
+.pminibar i{height:100%}
+.pcolor td{background:#f8fafc;font-size:12px}
+.pcolor .ch{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pcolor .sw2{width:20px;height:20px;border-radius:5px;border:1px solid #cbd5e1;flex:none}
+.pcolor .cnm{font-weight:800;color:#0f172a}
+.pcolor .cpr{color:#64748b;font-weight:600}
+.pcolor .cst{margin-left:auto;color:#475569;font-weight:600;font-size:11px}
+.npill{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:700;font-size:11px;white-space:nowrap}
+.n-ok{background:#dcfce7;color:#15803d}
+.n-mais{background:#fee2e2;color:#b91c1c}
+.n-menos{background:#fef3c7;color:#b45309}
+.n-na{background:#f1f5f9;color:#64748b}
+/* Comparação de grades venda × produção */
+.pgrade{display:none}
+#ptbl.show-grades .pgrade{display:table-row}
+.pgrade td{background:#fbfcfe;padding:10px 14px}
+.gpair{display:flex;gap:22px;align-items:flex-end;flex-wrap:wrap}
+.gchart{flex:1;min-width:220px}
+.gtit{font-size:11px;font-weight:700;color:#475569;margin-bottom:6px}
+.gbars{display:flex;gap:6px;align-items:flex-end;height:70px;border-bottom:1px solid var(--line)}
+.gcol{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.gcol .gtrack{width:100%;max-width:26px;height:58px;display:flex;align-items:flex-end}
+.gcol .gtrack i{display:block;width:100%;border-radius:3px 3px 0 0;min-height:2px}
+.gcol span{font-size:10px;color:#64748b;margin-top:3px}
+.gverdict{flex:none;min-width:180px;align-self:center}
+small.hint{display:block;color:var(--muted);font-size:11px;margin-top:3px}
+/* Estoque por local */
+.splitwrap{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:16px;box-shadow:var(--shadow)}
+.splittitle{font-weight:800;font-size:13px;margin-bottom:9px}
+.splitbar{display:flex;height:16px;border-radius:8px;overflow:hidden;background:#eef2f7}
+.splitbar i{display:block;height:100%}
+.splitlegend{display:flex;gap:22px;flex-wrap:wrap;margin-top:11px}
+.splitlegend .sl{display:flex;align-items:center;gap:8px}
+.splitlegend .dot{width:11px;height:11px;border-radius:3px;flex:none}
+.splitlegend .slv{font-weight:800;font-size:15px;line-height:1.1}
+.splitlegend .sll{font-size:11px;color:var(--muted)}
+.splitnote{font-size:12px;color:var(--muted)}
+td.savail{font-weight:800;background:#f1f5ff}
+td.cmcell{font-weight:700}
+td.nobrk{color:#c2c8d0}
+/* expandir detalhe por canal */
+td.exptog{cursor:pointer;color:#2563eb;font-weight:900;text-align:center;width:26px;user-select:none}
+td.exptog:hover{color:#0b1220}
+tr.detrow{display:none}
+tr.detrow.open{display:table-row}
+tr.detrow td{background:#f8fafc;padding:10px 14px}
+.detbox{display:flex;flex-direction:column;gap:7px}
+.detline{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.detlab{font-size:11px;font-weight:800;color:#475569;min-width:200px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:3px 11px;font-size:12px}
+.chip .cdot{width:9px;height:9px;border-radius:2px}
+/* Envios — cabeçalho por canal */
+tr.egrouphead th{background:#0b1220;color:#fff;text-align:center;font-size:11px;letter-spacing:.4px;border-bottom:2px solid #1e293b}
+tr.egrouphead th.ch-dom{background:#12305e}
+tr.egrouphead th.ch-ml{background:#5a4310}
+#etbl thead th.ch-dom{color:#93c5fd}
+#etbl thead th.ch-ml{color:#fcd34d}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="app">
+    <div class="brand">
+      <svg class="logo-svg" viewBox="0 0 230 96" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Urban Zone Jeans">
+        <rect x="4" y="4" width="222" height="88" rx="12" fill="none" stroke="#ffffff" stroke-width="4"/>
+        <text x="115" y="50" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="42" letter-spacing="3" fill="#ffffff">URBAN</text>
+        <rect x="44" y="62" width="142" height="2.5" fill="#ffffff" opacity="0"/>
+        <text x="115" y="76" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="15.5" letter-spacing="7.5" fill="#ffffff">ZONE JEANS</text>
+      </svg>
+    </div>
+    <div class="brand-txt">
+      <h1>Painel de Estoque &amp; Produção</h1>
+      <div class="sub">Inventário, vendas e produção consolidados · dados ao vivo da pasta do Drive</div>
+      <span id="driveBadge" class="drivebadge" style="display:none"></span>
+    </div>
+    <div class="headstat" id="headstat"></div>
+  </header>
+
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-p="visao">📊 Visão Geral</div>
+    <div class="tab" data-p="envios">🚚 Envios</div>
+    <div class="tab" data-p="producao">🏭 Produção</div>
+    <div class="tab" data-p="importar">📤 Importar planilhas</div>
+    <div class="tab" data-p="config">⚙️ Config</div>
+    <div class="tab" data-p="formulas">🧮 Fórmulas</div>
+  </div>
+
+  <!-- VISÃO GERAL -->
+  <section class="panel active" id="p-visao">
+    <div class="kpis" id="kpis"></div>
+    <div class="splitwrap" id="stockSplit"></div>
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="Filtrar SKU ou produto…">
+      <select id="fStatus">
+        <option value="">Todas as situações</option>
+        <option value="VAI ACABAR">Só VAI ACABAR</option>
+        <option value="ALERTA">Só ALERTA</option>
+        <option value="OK">Só OK</option>
+      </select>
+      <button class="btn ghost" id="applyAllSug" title="Define o crescimento sugerido como padrão de todos os produtos">✨ Aplicar todas as sugestões</button>
+    </div>
+    <div class="legend">
+      <span><i class="dot" style="background:#dc2626"></i> VAI ACABAR (≤ tempo desejado)</span>
+      <span><i class="dot" style="background:#d97706"></i> ALERTA (até limite)</span>
+      <span><i class="dot" style="background:#16a34a"></i> OK</span>
+    </div>
+    <div class="card scroll" style="margin-top:8px">
+      <table id="tbl">
+        <thead><tr id="thead"></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ENVIOS -->
+  <section class="panel" id="p-envios">
+    <div class="kpis" id="ekpis"></div>
+    <div class="toolbar">
+      <input type="search" id="eq" placeholder="Filtrar SKU ou produto…">
+      <select id="eStatus">
+        <option value="">Todos</option>
+        <option value="need">Só quem precisa enviar</option>
+      </select>
+      <span class="note">Canais de envio: <b>Domuslog</b> (Domuslog + Full Shopee somados) e <b>Full Mercado Livre</b>. Cada canal cobre a própria venda pelo tempo de estoque desejado.</span>
+    </div>
+    <div class="card scroll" style="margin-top:6px">
+      <table id="etbl">
+        <thead>
+          <tr class="egrouphead">
+            <th></th><th></th>
+            <th colspan="3" class="ch-dom">DOMUSLOG (+ Full Shopee)</th>
+            <th colspan="3" class="ch-ml">FULL MERCADO LIVRE</th>
+          </tr>
+          <tr id="ethead"></tr>
+        </thead>
+        <tbody id="etbody"></tbody>
+      </table>
+    </div>
+    <p class="note" style="margin-top:8px">Estoque ideal = consumo do canal ÷ 30 × tempo desejado. Envio ideal = ideal − estoque do canal. Envio possível é limitado pelo <b>Estq PE</b> (estoque único de produção; a Domuslog tem prioridade na distribuição).</p>
+  </section>
+
+  <!-- PRODUÇÃO -->
+  <section class="panel" id="p-producao">
+    <div class="kpis" id="pkpis"></div>
+    <div class="card" style="padding:14px 16px;margin-bottom:14px">
+      <div style="font-weight:800;margin-bottom:4px">Fluxo de produção — peças e tempo médio por etapa</div>
+      <div class="note" style="margin-bottom:10px">⏱ = dias médios que uma peça leva na etapa (em vermelho os gargalos ≥ 7 dias). Lead time médio do corte à finalização ≈ <b id="ltlabel"></b>.</div>
+      <div id="funnel"></div>
+    </div>
+    <div class="toolbar">
+      <input type="search" id="pq" placeholder="Filtrar produto, cor ou ficha…">
+      <label class="note" style="font-weight:600"><input type="checkbox" id="showGrades"> 📊 Comparar grade venda × produção</label>
+      <span class="note">Passe o mouse numa quantidade para ver as fichas e a data de entrada.</span>
+    </div>
+    <div class="card scroll" style="margin-top:4px">
+      <table id="ptbl"><thead><tr id="pthead"></tr></thead><tbody id="ptbody"></tbody></table>
+    </div>
+    <div class="legend" style="margin-top:8px">
+      <span><i class="dot" style="background:#b91c1c"></i> Fabricar mais (produção cobre &lt; 15 dias de venda)</span>
+      <span><i class="dot" style="background:#15803d"></i> Em linha com a venda</span>
+      <span><i class="dot" style="background:#b45309"></i> Fabricar menos (&gt; 60 dias de venda em produção)</span>
+      <span><i class="dot" style="background:#64748b"></i> Sem referência de venda</span>
+    </div>
+    <p class="note" style="margin-top:8px">Fonte: relatório Dapic 01/05/2026 → 26/06/2026. "Em produção" = peças enviadas a uma etapa e ainda não finalizadas nela (prevista − finalizada). A coluna <b>Nota vs venda</b> compara o total em produção de cada cor·tamanho com o consumo de venda (C. Mensal), casando produto+cor+tamanho com o SKU correto: Calça Sarja → C-{cor} (Areia=AR, Preto=P, Azul Marinho=AZM, Caqui=CQ, Verde Militar=VD, Cinza claro=CZC, Creme=CE); Bermuda → B.{cor}; Calça Embutido Sandy → C-JBE- (Carbono=AZE, Jeans Clara=AZC). Short Mauricinho fica sem referência. Passe o mouse na nota para ver o SKU e a venda mensal usada.</p>
+  </section>
+
+  <!-- IMPORTAR -->
+  <section class="panel" id="p-importar">
+    <div class="fbox" style="border-left:4px solid var(--accent)">
+      <h3>🟢 Visão real — pasta do Google Drive</h3>
+      <p class="note">A visão oficial e compartilhada vem de uma pasta no seu Google Drive: você sobe os relatórios lá e o app lê e interpreta sozinho (mesma pessoa vê o mesmo número). Funciona só depois de publicado no Netlify e configurado (passo a passo no README).</p>
+      <div class="toolbar">
+        <button class="btn" id="loadDrive">🔄 Carregar / atualizar visão real</button>
+        <button class="btn ghost" id="driveCfg" title="Apontar para a URL da função publicada (para testar fora do site)">⚙️ URL da função</button>
+        <span class="impst" id="driveStatus"></span>
+      </div>
+    </div>
+    <div class="fbox">
+      <h3>✋ Importação manual (só para você, agora)</h3>
+      <p class="note">Suba cada arquivo do jeito que vem do sistema — vale só para a sua sessão atual (não altera a visão real dos outros). O app acha as colunas pelo nome e cruza pelo SKU. Depois clique em <b>Consolidar</b>. <span id="xlsxWarn" style="color:#b91c1c;display:none">⚠️ A leitura de Excel não carregou aqui (sandbox) — abra o app publicado ou o HTML no navegador.</span></p>
+    </div>
+    <div class="imp-grid">
+      <div class="impcard">
+        <div class="impt">📦 Inventário Stokki (Domuslog)</div>
+        <div class="note">Arquivo <b>inventario…xlsx</b>. Lê <code>SKU</code> e <code>Disponível</code> → estoque na Domuslog.</div>
+        <input type="file" accept=".xlsx,.xls,.csv" data-src="domus">
+        <div class="impst" id="st-domus"></div>
+      </div>
+      <div class="impcard">
+        <div class="impt">🟠 Full Shopee</div>
+        <div class="note">Arquivo <b>Current Inventory Report…xlsx</b>. Lê <code>Seller SKU ID</code>, <code>Sellable</code> (estoque), <code>Pending ASN Inbound</code> (a caminho) e <code>unitsSoldInLast30Days</code> (consumo).</div>
+        <input type="file" accept=".xlsx,.xls,.csv" data-src="shopee">
+        <div class="impst" id="st-shopee"></div>
+      </div>
+      <div class="impcard">
+        <div class="impt">🟡 Full Mercado Livre</div>
+        <div class="note">Arquivo <b>stock_general…xlsx</b> (aba Resumo). Lê <code>SKU</code>, <code>Aptas para venda</code> (estoque), <code>Entrada pendente</code> (a caminho) e <code>Vendas últimos 30 dias (un.)</code> (consumo).</div>
+        <div class="note" style="color:#b45309">O ML exporta num formato que o leitor não abre direto. Se der erro, abra no Excel/Sheets e use <b>Salvar como → .xlsx</b> (ou CSV).</div>
+        <input type="file" accept=".xlsx,.xls,.csv" data-src="ml">
+        <div class="impst" id="st-ml"></div>
+      </div>
+      <div class="impcard">
+        <div class="impt">📤 Saídas Domuslog (consumo)</div>
+        <div class="note">Arquivo <b>saidas_por_produto…xlsx</b>. Lê <code>SKU</code> e <code>Quantidade</code>.</div>
+        <div class="note" style="color:#b45309;font-weight:600">⚠️ Alimente apenas com os dados do último mês fechado da Stokki.</div>
+        <input type="file" accept=".xlsx,.xls,.csv" data-src="saidas">
+        <div class="impst" id="st-saidas"></div>
+      </div>
+      <div class="impcard">
+        <div class="impt">🏭 Produção (Estq PE + Em Produção)</div>
+        <div class="note">Arquivo <b>pivot…xlsx</b>. Lê <code>Código de barras interno</code>, <code>Quantidade total disponível</code> (Estq PE) e <code>Quantidade total produção</code> (Em Produção).</div>
+        <input type="file" accept=".xlsx,.xls,.csv" data-src="prod">
+        <div class="impst" id="st-prod"></div>
+      </div>
+    </div>
+    <div class="toolbar" style="margin-top:14px">
+      <button class="btn" id="consolidar">✅ Consolidar e atualizar Visão Geral</button>
+      <button class="btn ghost" id="resetImport">Limpar importação</button>
+      <button class="btn ghost" id="loadDemo">↺ Dados de exemplo</button>
+      <span class="note" id="impResumo"></span>
+    </div>
+    <p class="note" style="margin-top:6px">Montagem das colunas: <b>Domuslog</b> = Disponível (inventário). <b>Domus+Full+Em trânsito</b> = Domuslog + Sellable(Shopee) + Aptas(ML) + Pending ASN(Shopee) + Entrada pendente(ML). <b>C. Mensal</b> = Saídas Domuslog + vendas 30d Shopee + vendas 30d ML. <b>Estq PE</b> e <b>Em Produção</b> = relatório de produção.</p>
+  </section>
+
+  <!-- CONFIG -->
+  <section class="panel" id="p-config">
+    <div class="fbox">
+      <h3>Parâmetros de cálculo</h3>
+      <div class="config-row">
+        <label>Tempo de estoque desejado (dias)</label>
+        <input type="number" id="cfgTempo" value="20" min="1" style="width:90px">
+        <small class="hint">Abaixo disso → <b>VAI ACABAR</b>. Valor do topo da planilha.</small>
+      </div>
+      <div class="config-row">
+        <label>Multiplicador do limite de ALERTA</label>
+        <input type="number" id="cfgMult" value="1.5" step="0.1" min="1" style="width:90px">
+        <small class="hint">ALERTA até <span id="cfgAlertaDias">30</span> dias (= tempo × multiplicador). Acima → OK.</small>
+      </div>
+      <div class="config-row">
+        <label>Ajuste global de tecido (multiplicador)</label>
+        <input type="number" id="cfgMetros" value="1.0" step="0.05" min="0" style="width:90px">
+        <small class="hint">Consumo de tecido por peça já é fixo: 1,3 m (calça) e 1,0 m (bermuda). Este campo é um multiplicador geral opcional.</small>
+      </div>
+      <button class="btn" id="applyCfg">Aplicar e recalcular</button>
+    </div>
+  </section>
+
+  <!-- FORMULAS -->
+  <section class="panel" id="p-formulas">
+    <div class="fbox">
+      <h3>Como cada coluna é calculada (réplica da planilha)</h3>
+      <p class="note">Estas fórmulas foram extraídas e validadas contra os valores reais da planilha. <code>tempo</code> = tempo de estoque desejado (20).</p>
+    </div>
+    <div class="grid2" id="fgrid"></div>
+  </section>
+
+  <p class="note" style="margin-top:16px;text-align:center">Urban Zone Jeans · Painel operacional · vem com dados de exemplo — use <b>📤 Importar planilhas</b> para carregar os números do dia.</p>
+</div>
+
+<script>
+// ---------- Dados-semente (valores reais extraídos da planilha) ----------
+// [SKU, DfullTransito, Domuslog, ESTQ_PE, EM_PRODUCAO, C_MENSAL]
+const FAMILIES = [
+ {nome:"Calça Sarja Creme Areia", pref:"C-AR-", cresc:0.2, cor:"Creme Areia", hex:"#d9c7a3", rows:[["C-AR-36",299,226,73,425,108],["C-AR-38",877,345,89,1501,679],["C-AR-40",974,311,76,1659,1186],["C-AR-42",393,74,224,2082,1527],["C-AR-44",695,243,160,2325,1313],["C-AR-46",784,215,126,2040,725],["C-AR-48",449,299,54,995,512],["C-AR-50",148,147,4,4,22],["C-AR-52",1,1,0,0,3]]},
+ {nome:"Calça Sarja Preta", pref:"C-P-", cresc:0.2, cor:"Preta", hex:"#222222", rows:[["C-P-36",587,447,477,289,345],["C-P-38",1092,388,715,827,872],["C-P-40",1717,687,662,1258,1535],["C-P-42",1044,0,5,2138,1944],["C-P-44",1212,350,233,2299,1823],["C-P-46",960,83,1,1710,1132],["C-P-48",393,203,123,866,590],["C-P-50",0,0,12,0,15]]},
+ {nome:"Calça Sarja Azul Marinho", pref:"C-AZM-", cresc:0.2, cor:"Azul Marinho", hex:"#1e3a5f", rows:[["C-AZM-36",122,60,271,193,70],["C-AZM-38",364,52,302,478,235],["C-AZM-40",626,171,218,869,518],["C-AZM-42",301,79,3,1696,757],["C-AZM-44",325,83,4,1708,582],["C-AZM-46",406,174,0,1324,410],["C-AZM-48",329,33,9,752,305],["C-AZM-50",217,217,28,0,24],["C-AZM-52",0,0,8,0,7]]},
+ {nome:"Calça Sarja Caqui", pref:"C-CQ-", cresc:0.3, cor:"Caqui", hex:"#8b7d5b", rows:[["C-CQ-36",187,148,30,33,69],["C-CQ-38",320,169,36,53,271],["C-CQ-40",187,54,52,499,456],["C-CQ-42",153,44,43,873,478],["C-CQ-44",143,39,32,810,536],["C-CQ-46",170,44,61,739,386],["C-CQ-48",72,61,19,430,200],["C-CQ-50",15,15,5,0,13]]},
+ {nome:"Calça Sarja Verde Militar", pref:"C-VD-", cresc:0.2, cor:"Verde Militar", hex:"#4b5320", rows:[["C-VD-36",95,95,10,0,18],["C-VD-38",154,154,2,70,60],["C-VD-40",14,14,23,186,149],["C-VD-42",37,37,23,344,122],["C-VD-44",12,12,14,344,175],["C-VD-46",30,28,42,344,158],["C-VD-48",21,21,17,190,28],["C-VD-50",20,20,2,0,1],["C-VD-52",0,0,0,2,1]]},
+ {nome:"Calça Sarja Creme Escuro", pref:"C-CE-", cresc:0.2, cor:"Creme Escuro", hex:"#cbb994", rows:[["C-CE-36",128,92,88,7,46],["C-CE-38",194,113,182,177,84],["C-CE-40",355,200,666,13,192],["C-CE-42",150,26,90,184,284],["C-CE-44",160,39,68,505,213],["C-CE-46",166,21,375,338,169],["C-CE-48",66,27,22,332,127],["C-CE-50",0,0,1,0,2],["C-CE-52",0,0,0,0,1]]},
+ {nome:"Calça Sarja Bordô", pref:"C-BD-", cresc:0.2, cor:"Bordô", hex:"#6b1f2e", rows:[["C-BD-38",0,0,0,0,2],["C-BD-40",4,4,73,2,9],["C-BD-42",28,28,91,0,9],["C-BD-44",11,11,110,2,5],["C-BD-46",0,0,64,0,8],["C-BD-48",13,13,60,1,3]]},
+ {nome:"Calça Sarja Cinza Clara", pref:"C-CZC-", cresc:0.2, cor:"Cinza Clara", hex:"#b0b4ba", rows:[["C-CZC-36",65,35,21,274,33],["C-CZC-38",221,34,40,493,279],["C-CZC-40",147,9,48,726,695],["C-CZC-42",255,127,36,1005,785],["C-CZC-44",261,74,11,1030,888],["C-CZC-46",191,73,17,636,500],["C-CZC-48",50,36,41,469,194],["C-CZC-50",7,7,18,8,10],["C-CZC-52",0,0,19,1,2]]},
+ {nome:"Bermuda Sarja Areia", pref:"B.AR-", cresc:0.2, cor:"Areia", hex:"#d9c7a3", rows:[["B.AR-36",76,47,51,45,14],["B.AR-38",66,30,63,68,32],["B.AR-40",62,24,52,72,61],["B.AR-42",53,0,53,74,95],["B.AR-44",49,2,21,72,77],["B.AR-46",120,92,37,72,36],["B.AR-48",82,82,53,0,21],["B.AR-50",12,12,6,0,1]]},
+ {nome:"Bermuda Sarja Preta", pref:"B.P-", cresc:0.2, cor:"Preta", hex:"#222222", rows:[["B.P-36",36,1,57,80,21],["B.P-38",75,24,95,102,27],["B.P-40",59,14,92,102,62],["B.P-42",84,18,51,104,56],["B.P-44",74,17,78,102,46],["B.P-46",65,19,85,106,60],["B.P-48",3,3,15,0,17],["B.P-50",27,27,1,0,4]]},
+ {nome:"Bermuda Sarja Caqui", pref:"B.CQ-", cresc:0.2, cor:"Caqui", hex:"#8b7d5b", rows:[["B.CQ-36",77,77,26,0,9],["B.CQ-38",9,9,62,25,16],["B.CQ-40",0,0,87,28,28],["B.CQ-42",30,30,40,28,50],["B.CQ-44",11,11,27,29,54],["B.CQ-46",34,34,49,27,34],["B.CQ-48",33,33,87,2,12],["B.CQ-50",26,26,18,1,2]]},
+ {nome:"Bermuda Sarja Azul Marinho", pref:"B.AZM-", cresc:0.2, cor:"Azul Marinho", hex:"#1e3a5f", rows:[["B.AZM-36",112,79,20,59,12],["B.AZM-38",81,32,75,84,20],["B.AZM-40",91,53,138,44,61],["B.AZM-42",105,46,77,44,81],["B.AZM-44",44,0,66,45,68],["B.AZM-46",64,29,83,43,52],["B.AZM-48",7,7,125,0,13],["B.AZM-50",34,34,14,0,5],["B.AZM-52",15,15,9,0,1]]},
+ {nome:"Bermuda Sarja Creme Escuro", pref:"B.CE-", cresc:0.2, cor:"Creme Escuro", hex:"#cbb994", rows:[["B.CE-36",20,20,49,21,13],["B.CE-38",1,1,34,37,14],["B.CE-40",19,19,41,39,43],["B.CE-42",48,48,75,37,50],["B.CE-44",1,1,37,44,38],["B.CE-46",12,12,79,39,22],["B.CE-48",32,32,62,2,5],["B.CE-50",23,23,2,2,2]]},
+ {nome:"Bermuda Sarja Verde Militar", pref:"B.VD-", cresc:0.2, cor:"Verde Militar", hex:"#4b5320", rows:[["B.VD-36",62,62,66,1,11],["B.VD-38",46,46,55,26,18],["B.VD-40",6,6,8,23,29],["B.VD-42",13,13,15,25,50],["B.VD-44",67,67,19,24,33],["B.VD-46",15,15,18,25,25],["B.VD-48",23,23,26,0,17]]},
+ {nome:"Bermuda Sarja Cinza Clara", pref:"B.CZC-", cresc:0.2, cor:"Cinza Clara", hex:"#b0b4ba", rows:[["B.CZC-36",37,37,49,21,1],["B.CZC-38",94,94,49,43,3],["B.CZC-40",154,154,61,46,1],["B.CZC-42",26,24,89,43,8],["B.CZC-44",33,33,77,46,10],["B.CZC-46",29,29,78,50,2],["B.CZC-48",29,29,21,2,2]]},
+ {nome:"Bermuda Sarja Branca", pref:"B.BA-", cresc:0.2, cor:"Branca", hex:"#e5e7eb", rows:[["B.BA-36",1,1,10,0,6],["B.BA-38",0,0,7,0,4],["B.BA-40",11,11,45,0,6],["B.BA-42",6,6,134,1,11],["B.BA-44",10,10,119,1,9],["B.BA-46",36,36,83,0,1],["B.BA-48",47,47,73,0,1]]},
+ {nome:"Bermuda Sarja Rosê", pref:"B.RS-", cresc:0.2, cor:"Rosê", hex:"#e8b7b0", rows:[["B.RS-38",39,39,40,0,4],["B.RS-40",39,39,21,0,1],["B.RS-42",7,7,41,0,5],["B.RS-44",0,0,12,0,5],["B.RS-46",6,6,19,0,7],["B.RS-48",46,46,22,0,2]]},
+ {nome:"Bermuda Jeans Preta", pref:"B.JP-", cresc:0.2, cor:"Preta", hex:"#2f3a44", rows:[["B.JP-38",0,0,10,0,5],["B.JP-40",54,54,13,0,7],["B.JP-42",0,0,10,0,17],["B.JP-44",3,3,19,0,14],["B.JP-46",78,78,10,0,5]]},
+ {nome:"Bermuda Jeans Média", pref:"B.JM-", cresc:0.2, cor:"Média", hex:"#5a7a99", rows:[["B.JM-38",1,1,0,46,1],["B.JM-44",0,0,0,50,3],["B.JM-46",1,1,0,47,10]]},
+ {nome:"Bermuda Jeans Azul Claro", pref:"B.JAZC-", cresc:0.2, cor:"Azul Claro", hex:"#8fb0cf", rows:[["B.JAZC-36",33,33,0,2,4],["B.JAZC-38",0,0,12,3,23],["B.JAZC-40",1,1,10,4,21],["B.JAZC-42",0,0,9,0,41],["B.JAZC-44",0,0,10,5,24],["B.JAZC-46",13,13,0,8,17],["B.JAZC-48",6,6,9,0,2]]},
+ {nome:"Calça Embutido Sandy Carbono", pref:"C-JBE-AZE-", cresc:0.2, cor:"Sandy Carbono", hex:"#3a3a3a", rows:[["C-JBE-AZE-36",82,81,38,1,26],["C-JBE-AZE-38",30,30,113,1,52],["C-JBE-AZE-40",67,67,155,1,73],["C-JBE-AZE-42",0,0,96,4,109],["C-JBE-AZE-44",2,0,24,1,136],["C-JBE-AZE-46",26,26,37,2,80],["C-JBE-AZE-48",0,0,0,1,16],["C-JBE-AZE-50",1,1,2,0,2]]},
+ {nome:"Calça Embutido Sandy Jeans Clara", pref:"C-JBE-AZC-", cresc:0.2, cor:"Jeans Clara", hex:"#6b8fb5", rows:[["C-JBE-AZC-36",207,199,10,67,27],["C-JBE-AZC-38",121,121,101,67,62],["C-JBE-AZC-40",47,47,133,101,135],["C-JBE-AZC-42",1,0,34,121,123],["C-JBE-AZC-44",1,0,0,66,195],["C-JBE-AZC-46",49,49,52,58,82],["C-JBE-AZC-48",33,33,74,10,1]]}
+];
+
+// Configuração por produto (editável): crescimento, cor, hex
+let FAMCFG = {};
+function initFamCfg(reset){
+  FAMILIES.forEach(f=>{
+    if(reset || !FAMCFG[f.nome]) FAMCFG[f.nome]={cresc:f.cresc, cor:f.cor, hex:f.hex};
+  });
+}
+
+// ---------- Estado ----------
+let CFG = {tempo:20, mult:1.5, metros:1.0};
+let DATA = [];      // {sku, fam, cresc, dfull, dom, pe, prod, cmensal}
+let saidasMap = null; // sku -> consumo (sobrescreve cmensal)
+let sortKey = null, sortDir = 1;
+
+function seed(){
+  DATA = [];
+  initFamCfg(true);
+  FAMILIES.forEach(f=>f.rows.forEach(r=>{
+    DATA.push({sku:r[0], fam:f.nome, dfull:r[1], dom:r[2], pe:r[3], prod:r[4], cmensal:r[5]});
+  }));
+}
+
+// Sugestão de crescimento baseada na pressão de demanda (volume em risco na família)
+function pressao(famName){
+  const fr = rowsComputed().filter(r=>r.fam===famName);
+  const tot = fr.reduce((s,r)=>s+r.cmensal,0);
+  if(tot<=0) return 0;
+  const crit = fr.filter(r=>r.sit==="VAI ACABAR").reduce((s,r)=>s+r.cmensal,0);
+  const al   = fr.filter(r=>r.sit==="ALERTA").reduce((s,r)=>s+r.cmensal,0);
+  return (crit + 0.5*al)/tot; // 0..1
+}
+function suggestGrowth(famName){
+  const p = pressao(famName);
+  let g = 0.20;
+  if(p>=0.6) g=0.40; else if(p>=0.4) g=0.30; else if(p>=0.2) g=0.25; else g=0.20;
+  return {g, p};
+}
+
+// ---------- Fórmulas (núcleo) ----------
+function compute(d){
+  const cmensal = (saidasMap && saidasMap[d.sku]!=null) ? saidasMap[d.sku] : d.cmensal;
+  const diario = cmensal/30;
+  const savail = d.dfull + d.dom;                 // estoque disponível p/ venda
+  const formato = d.dfull + d.dom + d.pe + d.prod; // FORMATO DA GRADE ATUAL
+  const estIdeal = Math.round(diario * CFG.tempo); // ESTOQUE IDEAL (tempo) dias
+  const envIdeal = estIdeal - savail;              // ENVIO IDEAL
+  const envPoss  = Math.min(envIdeal, d.pe);       // ENVIO POSSÍVEL (limitado pelo ESTQ PE)
+  const envLabel = (envPoss === envIdeal) ? "IDEAL" : "POSSÍVEL";
+  let dias=null, sit="OK";
+  if(cmensal>0){
+    dias = Math.round(savail/diario);
+    if(dias <= CFG.tempo) sit="VAI ACABAR";
+    else if(dias < CFG.tempo*CFG.mult) sit="ALERTA";
+    else sit="OK";
+  }
+  // ----- Envios por canal: Domuslog(+Full Shopee) e Full ML -----
+  const hasCons = (d.cmDomus!=null||d.cmShopee!=null||d.cmMl!=null);
+  const consDom = hasCons ? (d.cmDomus||0)+(d.cmShopee||0) : null; // Domuslog + Full Shopee
+  const consMl  = hasCons ? (d.cmMl||0) : null;
+  const estDom  = (d.dom||0)+(d.shopee||0);   // estoque Domuslog + Full Shopee
+  const estMl   = (d.ml||0);                  // estoque Full ML
+  const idealDom = consDom!=null?Math.round(consDom/30*CFG.tempo):null;
+  const idealMl  = consMl!=null?Math.round(consMl/30*CFG.tempo):null;
+  const eiDom = idealDom!=null? idealDom-estDom : null;  // envio ideal Domuslog
+  const eiMl  = idealMl!=null?  idealMl-estMl  : null;   // envio ideal ML
+  // envio possível limitado pelo Estq PE (estoque único) — Domuslog tem prioridade
+  let peLeft = d.pe, epDom=null, epMl=null;
+  if(eiDom!=null){ epDom = eiDom>0?Math.min(eiDom,peLeft):eiDom; if(epDom>0) peLeft-=epDom; }
+  if(eiMl!=null){  epMl  = eiMl>0? Math.min(eiMl,peLeft):eiMl; }
+  const chDom = idealDom==null?null:{est:estDom, ideal:idealDom, envI:eiDom, envP:epDom};
+  const chMl  = idealMl==null? null:{est:estMl,  ideal:idealMl,  envI:eiMl,  envP:epMl};
+  return {cmensal, cmDomus:d.cmDomus, cmShopee:d.cmShopee, cmMl:d.cmMl, hasCons,
+          savail, formato, estIdeal, envIdeal, envPoss, envLabel, dias, sit, chDom, chMl};
+}
+
+// ---------- Render Visão Geral ----------
+const COLS = [
+  {k:"sku",t:"SKU",l:true},
+  {k:"savail",t:"Estoque total"},
+  {k:"cmensal",t:"Consumo mensal"},
+  {k:"formato",t:"Grade atual"},
+  {k:"dias",t:"Esgota em (dias)"},
+  {k:"sit",t:"Situação",l:true}
+];
+
+function rowsComputed(){
+  return DATA.map(d=>({...d, ...compute(d)}));
+}
+
+function renderKpis(rows){
+  const va=rows.filter(r=>r.sit==="VAI ACABAR").length;
+  const al=rows.filter(r=>r.sit==="ALERTA").length;
+  const ok=rows.filter(r=>r.sit==="OK").length;
+  const envio=rows.reduce((s,r)=>s+(r.envPoss>0?r.envPoss:0),0);
+  document.getElementById("kpis").innerHTML = `
+   <div class="kpi"><div class="n">${rows.length}</div><div class="l">SKUs</div></div>
+   <div class="kpi va"><div class="n">${va}</div><div class="l">Vão acabar</div></div>
+   <div class="kpi al"><div class="n">${al}</div><div class="l">Em alerta</div></div>
+   <div class="kpi ok"><div class="n">${ok}</div><div class="l">OK</div></div>
+   <div class="kpi"><div class="n">${envio.toLocaleString('pt-BR')}</div><div class="l">Envio possível total (un)</div></div>`;
+  const hs=document.getElementById("headstat");
+  if(hs) hs.innerHTML=`
+    <div class="hs"><div class="n">${rows.length}</div><div class="l">SKUs</div></div>
+    <div class="hs"><div class="n">${va}</div><div class="l">Vão acabar</div></div>
+    <div class="hs"><div class="n">${al}</div><div class="l">Em alerta</div></div>`;
+  renderSplit(rows);
+}
+
+// Estoque separado por local: Domuslog · Full Shopee · Full ML · Em trânsito
+function renderSplit(rows){
+  const el=document.getElementById("stockSplit"); if(!el) return;
+  const has=rows.some(r=>r.shopee!=null||r.ml!=null||r.transito!=null);
+  const sum=k=>rows.reduce((s,r)=>s+(r[k]||0),0);
+  const dom=sum('dom'), sh=sum('shopee'), ml=sum('ml'), tr=sum('transito');
+  const tot=dom+sh+ml+tr;
+  if(!has){
+    el.innerHTML=`<div class="splitnote">Estoque na Domuslog: <b>${dom.toLocaleString('pt-BR')}</b> un · o detalhamento por canal (Full Shopee, Full ML e em trânsito) aparece ao carregar a <b>visão real</b> ou importar as planilhas.</div>`;
+    return;
+  }
+  const parts=[
+    {l:'Domuslog',      v:dom, c:'#2563eb'},
+    {l:'Full Shopee',   v:sh,  c:'#f97316'},
+    {l:'Full Mercado Livre', v:ml, c:'#eab308'},
+    {l:'Em trânsito',   v:tr,  c:'#94a3b8'}
+  ];
+  const pct=v=>tot?(v/tot*100):0;
+  el.innerHTML=`
+    <div class="splittitle">Estoque por local <span class="note">· total ${tot.toLocaleString('pt-BR')} un</span></div>
+    <div class="splitbar">${parts.map(p=>p.v>0?`<i style="width:${pct(p.v).toFixed(2)}%;background:${p.c}" title="${p.l}: ${p.v.toLocaleString('pt-BR')} un"></i>`:'').join('')}</div>
+    <div class="splitlegend">${parts.map(p=>`
+      <div class="sl"><span class="dot" style="background:${p.c}"></span>
+        <div><div class="slv">${p.v.toLocaleString('pt-BR')}</div>
+        <div class="sll">${p.l} · ${pct(p.v).toFixed(1)}%</div></div></div>`).join('')}</div>`;
+}
+
+function fmt(v){ return (typeof v==="number")? v.toLocaleString('pt-BR') : v; }
+function pillClass(s){ return "s-"+s.replace(/\s/g,""); }
+function detailHTML(r){
+  const chip=(l,v,c)=>`<span class="chip"><span class="cdot" style="background:${c}"></span><b>${v==null?'—':fmt(v)}</b> ${l}</span>`;
+  const stk=chip('Domuslog',r.dom,'#2563eb')+chip('Full Shopee',r.shopee,'#f97316')+chip('Full ML',r.ml,'#eab308')+chip('Em trânsito',r.transito,'#94a3b8');
+  const con=chip('Domuslog',r.cmDomus,'#2563eb')+chip('Full Shopee',r.cmShopee,'#f97316')+chip('Full ML',r.cmMl,'#eab308');
+  return `<div class="detbox">
+    <div class="detline"><span class="detlab">📦 Estoque por canal</span>${stk}</div>
+    <div class="detline"><span class="detlab">🛒 Consumo mensal por canal</span>${con}${r.hasCons?'':'<span class="note">— detalhe por canal só na visão real / importação</span>'}</div>
+  </div>`;
+}
+
+function renderTable(){
+  let rows = rowsComputed();
+  const q=document.getElementById("q").value.trim().toLowerCase();
+  const fs=document.getElementById("fStatus").value;
+  const filt=(r)=>(!q||r.sku.toLowerCase().includes(q)||r.fam.toLowerCase().includes(q))&&(!fs||r.sit===fs);
+
+  // head (coluna extra para o expandir)
+  document.getElementById("thead").innerHTML = `<th></th>`+COLS.map(c=>`<th class="${c.l?'l':''}" data-k="${c.k}">${c.t}</th>`).join("");
+
+  const tb=document.getElementById("tbody"); tb.innerHTML="";
+
+  const emit=(r,maxF)=>{
+    const tds=COLS.map(c=>{
+      let v=r[c.k];
+      if(c.k==="sit") return `<td class="l"><span class="pill ${pillClass(v)}">${v}</span></td>`;
+      if(c.k==="dias") return `<td>${v==null?'<span class="note">indefinido</span>':v}</td>`;
+      if(c.k==="formato"){
+        const w=Math.max(2,Math.round((v/(maxF||1))*100));
+        return `<td><div class="gradebar"><i style="width:${w}%"></i><b>${fmt(v)}</b></div></td>`;
+      }
+      if(v==null) return `<td class="nobrk">—</td>`;
+      if(c.k==="savail") return `<td class="savail">${fmt(v)}</td>`;
+      if(c.k==="cmensal") return `<td class="cmcell">${fmt(v)}</td>`;
+      return `<td class="${c.l?'l':''}">${fmt(v)}</td>`;
+    }).join("");
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td class="exptog" data-sku="${r.sku}" title="Ver estoque e consumo por canal">▸</td>`+tds;
+    tb.appendChild(tr);
+    const dr=document.createElement("tr"); dr.className="detrow"; dr.dataset.for=r.sku;
+    dr.innerHTML=`<td colspan="${COLS.length+1}">${detailHTML(r)}</td>`;
+    tb.appendChild(dr);
+  };
+
+  // Ordem de produtos: famílias-semente primeiro, depois quaisquer produtos colados
+  const famOrder=[...FAMILIES.map(f=>f.nome)];
+  DATA.forEach(d=>{ if(!famOrder.includes(d.fam)) famOrder.push(d.fam); });
+
+  // VISÃO POR PRODUTO É SEMPRE FIXA (corte de tecido é por produto)
+  famOrder.forEach(fam=>{
+    let fr=rows.filter(r=>r.fam===fam);
+    if(!FAMCFG[fam]) FAMCFG[fam]={cresc:0.20,cor:'',hex:'#9ca3af'};
+    const cfg=FAMCFG[fam];
+    const undM=fr.reduce((s,r)=>s+r.cmensal,0);
+    fr=fr.filter(filt);
+    if(sortKey) fr.sort((a,b)=>{let x=a[sortKey],y=b[sortKey];if(x==null)x=-1;if(y==null)y=-1;return (typeof x==="string")?x.localeCompare(y)*sortDir:(x-y)*sortDir;});
+    if(!fr.length) return;
+
+    const undS=Math.round(undM/30*7);
+    const mpp=/bermuda/i.test(fam)?1.0:1.3;                 // tecido: 1,3 m/peça calça · 1,0 bermuda
+    const metros=Math.round(undM*mpp*CFG.metros);
+    const maxFormato=Math.max(1,...fr.map(r=>r.formato));
+    const sug=suggestGrowth(fam);
+    const sugMatch=Math.abs(sug.g-cfg.cresc)<1e-9;
+
+    const ftr=document.createElement("tr"); ftr.className="fam-row";
+    ftr.innerHTML=`<td colspan="${COLS.length+1}" style="border-left:6px solid ${cfg.hex}">
+      <div class="fam-head">
+        <input type="color" class="sw" data-fam="${fam}" data-act="hex" value="${cfg.hex}" title="Cor do produto">
+        <input type="text" class="corname" data-fam="${fam}" data-act="cor" value="${cfg.cor||''}" placeholder="cor…" title="Cadastro da cor">
+        <span class="fam-name">${fam}</span>
+        <span class="grow">
+          Crescimento
+          <input type="number" class="grin" data-fam="${fam}" data-act="cresc" value="${Math.round(cfg.cresc*100)}" min="0" step="5">%
+          <button class="sugbtn ${sugMatch?'on':''}" data-fam="${fam}" data-act="useSug"
+            title="Pressão de demanda: ${(sug.p*100).toFixed(0)}% do volume em risco. Clique para tornar padrão.">
+            ${sugMatch?'✓ usando sugestão':'sugestão: '+Math.round(sug.g*100)+'% — usar'}
+          </button>
+        </span>
+        <span class="fam-stats">${undM.toLocaleString('pt-BR')} un/mês · ${undS.toLocaleString('pt-BR')}/sem · tecido ~${metros.toLocaleString('pt-BR')} m (${mpp.toLocaleString('pt-BR')} m/peça)</span>
+      </div></td>`;
+    tb.appendChild(ftr);
+    fr.forEach(r=>emit(r,maxFormato));
+  });
+  renderKpis(rowsComputed());
+  renderEnvios();
+}
+
+// ================= ENVIOS (por canal) =================
+const ECOLS=[
+  {k:"est",t:"Est. Ideal"},{k:"envI",t:"Envio Ideal"},{k:"envP",t:"Envio Possível"}
+];
+function envCell(ch,key){
+  if(!ch) return `<td class="nobrk">—</td>`;
+  const v=ch[key];
+  if(key==="est") return `<td>${fmt(v)}</td>`;
+  if(v<=0) return `<td class="env-off" title="Nada a enviar (estoque do canal já no ideal)">·</td>`;
+  return `<td class="env-send">${fmt(v)}</td>`;
+}
+function renderEnvios(){
+  const thead=document.getElementById("ethead"); if(!thead) return;
+  thead.innerHTML=`<th></th><th class="l" data-k="sku">SKU</th>`+
+    ECOLS.map(c=>`<th class="ch-dom">${c.t}</th>`).join("")+
+    ECOLS.map(c=>`<th class="ch-ml">${c.t}</th>`).join("");
+  let rows=rowsComputed();
+  const q=(document.getElementById("eq").value||'').trim().toLowerCase();
+  const onlyNeed=document.getElementById("eStatus").value==='need';
+  const filt=r=>(!q||r.sku.toLowerCase().includes(q)||r.fam.toLowerCase().includes(q))&&
+    (!onlyNeed|| (r.chDom&&r.chDom.envP>0) || (r.chMl&&r.chMl.envP>0));
+  // KPIs de envio
+  let posDom=0,posMl=0,needDom=0,needMl=0;
+  rows.forEach(r=>{ if(r.chDom&&r.chDom.envP>0){posDom+=r.chDom.envP;needDom++;} if(r.chMl&&r.chMl.envP>0){posMl+=r.chMl.envP;needMl++;} });
+  document.getElementById("ekpis").innerHTML=`
+    <div class="kpi"><div class="n" style="color:#1d4ed8">${posDom.toLocaleString('pt-BR')}</div><div class="l">Enviar p/ Domuslog (un)</div></div>
+    <div class="kpi"><div class="n" style="color:#b45309">${posMl.toLocaleString('pt-BR')}</div><div class="l">Enviar p/ Full ML (un)</div></div>
+    <div class="kpi"><div class="n">${needDom}</div><div class="l">SKUs a repor · Domuslog</div></div>
+    <div class="kpi"><div class="n">${needMl}</div><div class="l">SKUs a repor · Full ML</div></div>`;
+  const tb=document.getElementById("etbody"); tb.innerHTML="";
+  const famOrder=[...FAMILIES.map(f=>f.nome)]; DATA.forEach(d=>{if(!famOrder.includes(d.fam))famOrder.push(d.fam);});
+  const ncol=2+ECOLS.length*2;
+  famOrder.forEach(fam=>{
+    let fr=rows.filter(r=>r.fam===fam).filter(filt);
+    if(!fr.length) return;
+    const cfg=FAMCFG[fam]||{hex:'#9ca3af'};
+    const ftr=document.createElement("tr"); ftr.className="fam-row";
+    ftr.innerHTML=`<td colspan="${ncol}" style="border-left:6px solid ${cfg.hex}"><div class="fam-head"><span class="sw2" style="background:${cfg.hex}"></span><span class="fam-name">${fam}</span></div></td>`;
+    tb.appendChild(ftr);
+    fr.forEach(r=>{
+      const tr=document.createElement("tr");
+      tr.innerHTML=`<td></td><td class="l"><b style="font-family:ui-monospace,Menlo,Consolas,monospace">${r.sku}</b></td>`+
+        ECOLS.map(c=>envCell(r.chDom,c.k)).join("")+
+        ECOLS.map(c=>envCell(r.chMl,c.k)).join("");
+      tb.appendChild(tr);
+    });
+  });
+}
+
+// Edição inline das configurações por produto
+document.getElementById("tbody").addEventListener("change",e=>{
+  const el=e.target, fam=el.dataset.fam, act=el.dataset.act;
+  if(!fam||!act) return;
+  FAMCFG[fam]=FAMCFG[fam]||{};
+  if(act==="hex") FAMCFG[fam].hex=el.value;
+  if(act==="cor") FAMCFG[fam].cor=el.value;
+  if(act==="cresc") FAMCFG[fam].cresc=Math.max(0,(parseFloat(el.value)||0)/100);
+  persist(); renderTable();
+});
+document.getElementById("tbody").addEventListener("click",e=>{
+  const el=e.target; if(el.dataset.act!=="useSug") return;
+  const fam=el.dataset.fam, sug=suggestGrowth(fam);
+  FAMCFG[fam]=FAMCFG[fam]||{}; FAMCFG[fam].cresc=sug.g;
+  persist(); renderTable();
+});
+
+// ---------- Fórmulas tab ----------
+const FORMULAS=[
+ ["ESTOQUE IDEAL (tempo) dias","Quanto deveria existir para cobrir o tempo desejado.","ESTOQUE IDEAL = round( C.MENSAL / 30 × tempo )"],
+ ["ENVIO IDEAL","Quanto enviar para atingir o estoque ideal. Negativo = já está acima do ideal.","ENVIO IDEAL = ESTOQUE IDEAL − (Dom+Full+Trânsito + Domuslog)"],
+ ["ENVIO POSSÍVEL","Limitado pelo que existe fisicamente em PE.","ENVIO POSSÍVEL = mín( ENVIO IDEAL , ESTQ PE )"],
+ ["ENVIO (rótulo)","Indica se dá pra enviar o ideal completo.","= 'IDEAL' se ENVIO POSSÍVEL = ENVIO IDEAL, senão 'POSSÍVEL'"],
+ ["FORMATO DA GRADE ATUAL","Estoque total somando todos os locais.","= (Dom+Full+Trânsito) + Domuslog + ESTQ PE + EM PRODUÇÃO"],
+ ["C. MENSAL","Consumo real dos últimos 30 dias (soma dos canais na guia Saídas).","= Saídas Domuslog + Saídas Shopee Full + Saídas ML"],
+ ["ESGOTARÁ EM X DIAS","Dias até a ruptura no estoque disponível para venda.","= round( (Dom+Full+Trânsito + Domuslog) / (C.MENSAL/30) ) · 'indefinido' se C.MENSAL=0"],
+ ["SITUAÇÃO","Semáforo de risco.","dias ≤ tempo → VAI ACABAR · dias < tempo×mult → ALERTA · senão OK"],
+ ["Consumo família (un/mês)","Total do produto.","= soma de C.MENSAL de todos os tamanhos"],
+ ["Consumo de tecido (m)","Estimativa de metros.","≈ un/mês × (1 + Crescimento) × metros por peça"]
+];
+function renderFormulas(){
+  document.getElementById("fgrid").innerHTML = FORMULAS.map(f=>`
+   <div class="fbox"><h3>${f[0]}</h3><p class="note">${f[1]}</p><code>${f[2]}</code></div>`).join("");
+}
+
+// ---------- Carregar dados de exemplo ----------
+{ const b=document.getElementById("loadDemo");
+  if(b) b.onclick=()=>{ seed(); saidasMap=null; persist(); go("visao"); renderTable(); renderProdBody(); }; }
+
+document.getElementById("applyCfg").onclick=()=>{
+  CFG.tempo=Math.max(1,parseFloat(document.getElementById("cfgTempo").value)||20);
+  CFG.mult=Math.max(1,parseFloat(document.getElementById("cfgMult").value)||1.5);
+  CFG.metros=Math.max(0,parseFloat(document.getElementById("cfgMetros").value)||1);
+  document.getElementById("cfgAlertaDias").textContent=Math.round(CFG.tempo*CFG.mult);
+  persist(); renderTable();
+};
+
+// ---------- Tabs ----------
+function go(p){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.p===p));
+  document.querySelectorAll(".panel").forEach(s=>s.classList.toggle("active",s.id==="p-"+p));
+}
+document.getElementById("tabs").addEventListener("click",e=>{ if(e.target.dataset.p) go(e.target.dataset.p); });
+document.getElementById("q").addEventListener("input",renderTable);
+document.getElementById("fStatus").addEventListener("change",renderTable);
+document.getElementById("eq").addEventListener("input",renderEnvios);
+document.getElementById("eStatus").addEventListener("change",renderEnvios);
+document.getElementById("applyAllSug").addEventListener("click",()=>{
+  const famOrder=[...FAMILIES.map(f=>f.nome)];
+  DATA.forEach(d=>{ if(!famOrder.includes(d.fam)) famOrder.push(d.fam); });
+  famOrder.forEach(fam=>{ FAMCFG[fam]=FAMCFG[fam]||{}; FAMCFG[fam].cresc=suggestGrowth(fam).g; });
+  persist(); renderTable();
+});
+document.getElementById("thead").addEventListener("click",e=>{
+  const k=e.target.dataset.k; if(!k) return;
+  if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir=1;}
+  renderTable();
+});
+// expandir/recolher detalhe por canal
+document.getElementById("tbody").addEventListener("click",e=>{
+  const t=e.target.closest(".exptog"); if(!t) return;
+  const dr=t.closest("tr").nextElementSibling;
+  if(dr&&dr.classList.contains("detrow")){ const open=dr.classList.toggle("open"); t.textContent=open?"▾":"▸"; }
+});
+
+// ---------- Persistência (opcional) ----------
+const SEED_VERSION=3; // muda quando o seed de famílias é atualizado (invalida estado salvo antigo)
+function persist(){
+  try{ localStorage.setItem("uz_state", JSON.stringify({v:SEED_VERSION,CFG,DATA,saidasMap,FAMCFG})); }catch(e){}
+}
+function restore(){
+  try{
+    const s=JSON.parse(localStorage.getItem("uz_state")||"null");
+    if(s&&s.v===SEED_VERSION&&s.DATA&&s.DATA.length){ CFG=s.CFG||CFG; DATA=s.DATA; saidasMap=s.saidasMap||null;
+      if(s.FAMCFG) FAMCFG=s.FAMCFG; initFamCfg(false);
+      document.getElementById("cfgTempo").value=CFG.tempo;
+      document.getElementById("cfgMult").value=CFG.mult;
+      document.getElementById("cfgMetros").value=CFG.metros;
+      document.getElementById("cfgAlertaDias").textContent=Math.round(CFG.tempo*CFG.mult);
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+
+// ---------- PRODUÇÃO (dados Dapic) ----------
+const PROD_DATA = {"stages":["Aguardando início","Bolso Embutido","Facção - Bolso Embutido","Travete","Lavanderia - Amaciado","Aprontamento / Revisão","Finalização"],"stageTot":{"Aguardando início":1470,"Bolso Embutido":3446,"Facção - Bolso Embutido":12794,"Travete":18001,"Lavanderia - Amaciado":430,"Aprontamento / Revisão":7048,"Finalização":7049},"total":50238,"fichasAtivas":126,"products":[{"nome":"Calça Sarja Hud Cetim","q":43927,"rows":[{"cor":"Be404 -  Areia","tam":"34","st":{"Finalização":{"q":1,"f":[["987",1,"17/06/26"]]}}},{"cor":"Be404 -  Areia","tam":"36","st":{"Finalização":{"q":130,"f":[["957",55,"18/06/26"],["960",33,"19/06/26"],["947",22,"02/06/26"],["972",13,"12/06/26"],["958",3,"18/06/26"],["961",2,"04/06/26"]]},"Aprontamento / Revisão":{"q":56,"f":[["960",42,"13/06/26"],["957",14,"11/06/26"]]}}},{"cor":"Be404 -  Areia","tam":"38","st":{"Travete":{"q":651,"f":[["976",136,"22/05/26"],["978",119,"30/05/26"],["1026",111,"12/06/26"],["1040",103,"12/06/26"],["1007",84,"30/05/26"],["992",56,"05/06/26"]]},"Finalização":{"q":193,"f":[["950",64,"29/05/26"],["957",30,"18/06/26"],["958",26,"18/06/26"],["972",21,"12/06/26"],["960",18,"19/06/26"],["953",14,"05/06/26"]]},"Aprontamento / Revisão":{"q":146,"f":[["960",42,"13/06/26"],["958",34,"25/05/26"],["950",28,"21/05/26"],["972",14,"08/06/26"],["957",14,"11/06/26"],["954",14,"03/06/26"]]},"Facção - Bolso Embutido":{"q":242,"f":[["1039",102,"16/06/26"],["1028",98,"05/06/26"],["1042",28,"19/06/26"],["1007",14,"29/05/26"]]}}},{"cor":"Be404 -  Areia","tam":"40","st":{"Travete":{"q":651,"f":[["976",136,"22/05/26"],["978",119,"30/05/26"],["1026",111,"12/06/26"],["1040",103,"12/06/26"],["1007",84,"30/05/26"],["992",56,"05/06/26"]]},"Facção - Bolso Embutido":{"q":242,"f":[["1039",102,"16/06/26"],["1028",98,"05/06/26"],["1042",28,"19/06/26"],["1007",14,"29/05/26"]]},"Bolso Embutido":{"q":204,"f":[["1066",103,"19/06/26"],["1065",101,"19/06/26"]]},"Finalização":{"q":251,"f":[["950",54,"29/05/26"],["987",35,"12/06/26"],["960",33,"19/06/26"],["957",28,"18/06/26"],["947",23,"05/06/26"],["958",19,"18/06/26"]]},"Aprontamento / Revisão":{"q":211,"f":[["987",48,"09/06/26"],["960",42,"13/06/26"],["958",34,"25/05/26"],["950",28,"21/05/26"],["980",17,"09/06/26"],["954",14,"03/06/26"]]}}},{"cor":"Be404 -  Areia","tam":"42","st":{"Finalização":{"q":306,"f":[["977",62,"18/06/26"],["945",60,"29/05/26"],["961",45,"04/06/26"],["953",37,"09/06/26"],["972",20,"12/06/26"],["960",18,"19/06/26"]]},"Aprontamento / Revisão":{"q":552,"f":[["1018",188,"25/06/26"],["961",78,"29/05/26"],["977",54,"15/06/26"],["945",52,"21/05/26"],["960",42,"13/06/26"],["980",34,"09/06/26"]]},"Travete":{"q":917,"f":[["1035",188,"12/06/26"],["976",136,"22/05/26"],["978",119,"30/05/26"],["1026",111,"12/06/26"],["1040",103,"12/06/26"],["1007",84,"30/05/26"]]},"Facção - Bolso Embutido":{"q":539,"f":[["1056",219,"17/06/26"],["1039",102,"16/06/26"],["1028",98,"05/06/26"],["994",78,"23/05/26"],["1042",28,"19/06/26"],["1007",14,"29/05/26"]]},"Bolso Embutido":{"q":204,"f":[["1066",103,"19/06/26"],["1065",101,"19/06/26"]]}}},{"cor":"Be404 -  Areia","tam":"44","st":{"Aprontamento / Revisão":{"q":631,"f":[["1018",188,"25/06/26"],["987",96,"09/06/26"],["961",78,"29/05/26"],["977",54,"15/06/26"],["945",52,"21/05/26"],["960",42,"13/06/26"]]},"Travete":{"q":965,"f":[["1035",188,"12/06/26"],["976",136,"22/05/26"],["978",119,"30/05/26"],["1026",111,"12/06/26"],["1040",103,"12/06/26"],["988",96,"05/06/26"]]},"Facção - Bolso Embutido":{"q":539,"f":[["1056",219,"17/06/26"],["1039",102,"16/06/26"],["1028",98,"05/06/26"],["994",78,"23/05/26"],["1042",28,"19/06/26"],["1007",14,"29/05/26"]]},"Bolso Embutido":{"q":204,"f":[["1066",103,"19/06/26"],["1065",101,"19/06/26"]]},"Finalização":{"q":276,"f":[["961",64,"04/06/26"],["977",53,"18/06/26"],["953",31,"05/06/26"],["987",26,"12/06/26"],["954",24,"06/06/26"],["947",18,"05/06/26"]]}}},{"cor":"Be404 -  Areia","tam":"46","st":{"Finalização":{"q":469,"f":[["945",78,"29/05/26"],["961",74,"04/06/26"],["947",74,"02/06/26"],["953",70,"05/06/26"],["977",62,"18/06/26"],["954",31,"06/06/26"]]},"Aprontamento / Revisão":{"q":583,"f":[["1018",188,"25/06/26"],["961",78,"29/05/26"],["977",54,"15/06/26"],["945",52,"21/05/26"],["987",48,"09/06/26"],["960",42,"13/06/26"]]},"Travete":{"q":887,"f":[["1035",188,"12/06/26"],["976",136,"22/05/26"],["978",119,"30/05/26"],["1026",111,"12/06/26"],["1040",103,"12/06/26"],["1007",84,"30/05/26"]]},"Bolso Embutido":{"q":204,"f":[["1066",103,"19/06/26"],["1065",101,"19/06/26"]]},"Facção - Bolso Embutido":{"q":242,"f":[["1039",102,"16/06/26"],["1028",98,"05/06/26"],["1042",28,"19/06/26"],["1007",14,"29/05/26"]]}}},{"cor":"Be404 -  Areia","tam":"48","st":{"Travete":{"q":444,"f":[["1026",111,"12/06/26"],["1040",103,"12/06/26"],["1007",84,"30/05/26"],["992",56,"05/06/26"],["988",48,"05/06/26"],["1025",42,"19/06/26"]]},"Facção - Bolso Embutido":{"q":242,"f":[["1039",102,"16/06/26"],["1028",98,"05/06/26"],["1042",28,"19/06/26"],["1007",14,"29/05/26"]]},"Bolso Embutido":{"q":204,"f":[["1066",103,"19/06/26"],["1065",101,"19/06/26"]]},"Finalização":{"q":218,"f":[["950",49,"29/05/26"],["987",47,"12/06/26"],["954",46,"06/06/26"],["953",41,"05/06/26"],["972",29,"12/06/26"],["945",3,"29/05/26"]]},"Aprontamento / Revisão":{"q":104,"f":[["987",48,"09/06/26"],["950",28,"21/05/26"],["954",14,"03/06/26"],["972",14,"08/06/26"]]}}},{"cor":"Be404 -  Areia","tam":"50","st":{"Finalização":{"q":3,"f":[["945",2,"29/05/26"],["950",1,"29/05/26"]]}}},{"cor":"Be430x - Creme","tam":"38","st":{"Finalização":{"q":3,"f":[["969",3,"10/06/26"]]}}},{"cor":"Be430x - Creme","tam":"42","st":{"Finalização":{"q":2,"f":[["969",2,"05/06/26"]]}}},{"cor":"Be430x - Creme","tam":"44","st":{"Finalização":{"q":86,"f":[["969",86,"05/06/26"]]},"Travete":{"q":390,"f":[["1019",234,"12/06/26"],["1002",156,"30/05/26"]]},"Aguardando início":{"q":160,"f":[["1070",160,"—"]]},"Facção - Bolso Embutido":{"q":78,"f":[["1049",78,"23/06/26"]]}}},{"cor":"Be430x - Creme","tam":"46","st":{"Facção - Bolso Embutido":{"q":78,"f":[["1049",78,"23/06/26"]]},"Aguardando início":{"q":160,"f":[["1070",160,"—"]]},"Travete":{"q":156,"f":[["1002",156,"30/05/26"]]},"Finalização":{"q":24,"f":[["969",24,"05/06/26"]]}}},{"cor":"Be430x - Creme","tam":"48","st":{"Finalização":{"q":90,"f":[["969",90,"05/06/26"]]},"Travete":{"q":390,"f":[["1019",234,"12/06/26"],["1002",156,"30/05/26"]]},"Aguardando início":{"q":160,"f":[["1070",160,"—"]]},"Facção - Bolso Embutido":{"q":78,"f":[["1049",78,"23/06/26"]]}}},{"cor":"Cz14 - Cinza claro","tam":"34","st":{"Finalização":{"q":5,"f":[["948",3,"10/06/26"],["993",2,"12/06/26"]]}}},{"cor":"Cz14 - Cinza claro","tam":"36","st":{"Finalização":{"q":51,"f":[["971",30,"23/06/26"],["993",10,"12/06/26"],["948",9,"10/06/26"],["991",1,"17/06/26"],["990",1,"11/06/26"]]}}},{"cor":"Cz14 - Cinza claro","tam":"38","st":{"Finalização":{"q":63,"f":[["971",23,"25/06/26"],["993",16,"12/06/26"],["948",12,"10/06/26"],["991",11,"17/06/26"],["979",1,"11/06/26"]]},"Aprontamento / Revisão":{"q":98,"f":[["982",98,"22/06/26"]]},"Travete":{"q":164,"f":[["1043",83,"19/06/26"],["1036",81,"12/06/26"]]},"Facção - Bolso Embutido":{"q":251,"f":[["1059",86,"19/06/26"],["1060",84,"18/06/26"],["1044",81,"12/06/26"]]}}},{"cor":"Cz14 - Cinza claro","tam":"40","st":{"Facção - Bolso Embutido":{"q":251,"f":[["1059",86,"19/06/26"],["1060",84,"18/06/26"],["1044",81,"12/06/26"]]},"Travete":{"q":328,"f":[["1015",98,"19/06/26"],["1043",83,"19/06/26"],["1036",81,"12/06/26"],["998",66,"12/06/26"]]},"Aprontamento / Revisão":{"q":131,"f":[["982",98,"22/06/26"],["1000",33,"22/06/26"]]},"Finalização":{"q":130,"f":[["948",73,"10/06/26"],["993",28,"12/06/26"],["971",17,"23/06/26"],["991",12,"17/06/26"]]}}},{"cor":"Cz14 - Cinza claro","tam":"42","st":{"Finalização":{"q":102,"f":[["948",43,"10/06/26"],["971",22,"23/06/26"],["990",20,"11/06/26"],["991",12,"17/06/26"],["993",5,"12/06/26"]]},"Travete":{"q":559,"f":[["1014",231,"05/06/26"],["1015",98,"19/06/26"],["1043",83,"19/06/26"],["1036",81,"12/06/26"],["998",66,"12/06/26"]]},"Aprontamento / Revisão":{"q":131,"f":[["982",98,"22/06/26"],["1000",33,"22/06/26"]]},"Facção - Bolso Embutido":{"q":251,"f":[["1059",86,"19/06/26"],["1060",84,"18/06/26"],["1044",81,"12/06/26"]]}}},{"cor":"Cz14 - Cinza claro","tam":"44","st":{"Facção - Bolso Embutido":{"q":251,"f":[["1059",86,"19/06/26"],["1060",84,"18/06/26"],["1044",81,"12/06/26"]]},"Travete":{"q":559,"f":[["1014",231,"05/06/26"],["1015",98,"19/06/26"],["1043",83,"19/06/26"],["1036",81,"12/06/26"],["998",66,"12/06/26"]]},"Aprontamento / Revisão":{"q":131,"f":[["982",98,"22/06/26"],["1000",33,"22/06/26"]]},"Finalização":{"q":161,"f":[["948",82,"10/06/26"],["991",36,"17/06/26"],["993",20,"12/06/26"],["971",14,"23/06/26"],["990",9,"11/06/26"]]}}},{"cor":"Cz14 - Cinza claro","tam":"46","st":{"Finalização":{"q":193,"f":[["971",81,"23/06/26"],["993",61,"12/06/26"],["991",49,"17/06/26"],["990",2,"11/06/26"]]},"Travete":{"q":328,"f":[["1015",98,"19/06/26"],["1043",83,"19/06/26"],["1036",81,"12/06/26"],["998",66,"12/06/26"]]},"Aprontamento / Revisão":{"q":131,"f":[["982",98,"22/06/26"],["1000",33,"22/06/26"]]},"Facção - Bolso Embutido":{"q":251,"f":[["1059",86,"19/06/26"],["1060",84,"18/06/26"],["1044",81,"12/06/26"]]}}},{"cor":"Cz14 - Cinza claro","tam":"48","st":{"Facção - Bolso Embutido":{"q":251,"f":[["1059",86,"19/06/26"],["1060",84,"18/06/26"],["1044",81,"12/06/26"]]},"Travete":{"q":328,"f":[["1015",98,"19/06/26"],["1043",83,"19/06/26"],["1036",81,"12/06/26"],["998",66,"12/06/26"]]},"Aprontamento / Revisão":{"q":131,"f":[["982",98,"22/06/26"],["1000",33,"22/06/26"]]},"Finalização":{"q":67,"f":[["990",36,"11/06/26"],["991",31,"17/06/26"]]}}},{"cor":"Cz293x - Caqui claro","tam":"36","st":{"Finalização":{"q":16,"f":[["955",13,"29/05/26"],["949",2,"29/05/26"],["980",1,"16/06/26"]]}}},{"cor":"Cz293x - Caqui claro","tam":"38","st":{"Finalização":{"q":84,"f":[["949",37,"29/05/26"],["955",20,"29/05/26"],["985",16,"12/06/26"],["980",10,"12/06/26"],["997",1,"18/06/26"]]},"Travete":{"q":1,"f":[["1032",1,"12/06/26"]]}}},{"cor":"Cz293x - Caqui claro","tam":"40","st":{"Travete":{"q":286,"f":[["1051",100,"19/06/26"],["1032",96,"12/06/26"],["1020",80,"19/06/26"],["1052",10,"19/06/26"]]},"Facção - Bolso Embutido":{"q":278,"f":[["1068",102,"19/06/26"],["1034",99,"11/06/26"],["1052",77,"16/06/26"]]},"Bolso Embutido":{"q":102,"f":[["1067",102,"19/06/26"]]},"Finalização":{"q":170,"f":[["996",42,"25/06/26"],["979",38,"09/06/26"],["997",26,"16/06/26"],["985",20,"12/06/26"],["965",17,"26/05/26"],["980",8,"12/06/26"]]},"Aprontamento / Revisão":{"q":17,"f":[["996",17,"18/06/26"]]}}},{"cor":"Cz293x - Caqui claro","tam":"42","st":{"Finalização":{"q":234,"f":[["979",78,"09/06/26"],["980",50,"12/06/26"],["985",35,"12/06/26"],["996",26,"25/06/26"],["997",25,"16/06/26"],["949",11,"29/05/26"]]},"Aprontamento / Revisão":{"q":179,"f":[["963",162,"22/06/26"],["996",17,"18/06/26"]]},"Travete":{"q":366,"f":[["1051",100,"19/06/26"],["1032",96,"12/06/26"],["1001",80,"30/05/26"],["1020",80,"19/06/26"],["1052",10,"19/06/26"]]},"Facção - Bolso Embutido":{"q":278,"f":[["1068",102,"19/06/26"],["1034",99,"11/06/26"],["1052",77,"16/06/26"]]},"Bolso Embutido":{"q":102,"f":[["1067",102,"19/06/26"]]}}},{"cor":"Cz293x - Caqui claro","tam":"44","st":{"Travete":{"q":446,"f":[["1001",160,"30/05/26"],["1051",100,"19/06/26"],["1032",96,"12/06/26"],["1020",80,"19/06/26"],["1052",10,"19/06/26"]]},"Facção - Bolso Embutido":{"q":278,"f":[["1068",102,"19/06/26"],["1034",99,"11/06/26"],["1052",77,"16/06/26"]]},"Bolso Embutido":{"q":102,"f":[["1067",102,"19/06/26"]]},"Finalização":{"q":198,"f":[["949",61,"29/05/26"],["979",38,"09/06/26"],["985",36,"12/06/26"],["955",31,"29/05/26"],["997",14,"16/06/26"],["996",10,"25/06/26"]]},"Aprontamento / Revisão":{"q":179,"f":[["963",162,"22/06/26"],["996",17,"18/06/26"]]}}},{"cor":"Cz293x - Caqui claro","tam":"46","st":{"Finalização":{"q":236,"f":[["985",61,"12/06/26"],["979",60,"09/06/26"],["997",31,"16/06/26"],["949",28,"29/05/26"],["980",17,"12/06/26"],["996",16,"25/06/26"]]},"Aprontamento / Revisão":{"q":179,"f":[["963",162,"22/06/26"],["996",17,"18/06/26"]]},"Travete":{"q":366,"f":[["1051",100,"19/06/26"],["1032",96,"12/06/26"],["1001",80,"30/05/26"],["1020",80,"19/06/26"],["1052",10,"19/06/26"]]},"Facção - Bolso Embutido":{"q":278,"f":[["1068",102,"19/06/26"],["1034",99,"11/06/26"],["1052",77,"16/06/26"]]},"Bolso Embutido":{"q":102,"f":[["1067",102,"19/06/26"]]}}},{"cor":"Cz293x - Caqui claro","tam":"48","st":{"Travete":{"q":286,"f":[["1051",100,"19/06/26"],["1032",96,"12/06/26"],["1001",80,"30/05/26"],["1052",10,"19/06/26"]]},"Facção - Bolso Embutido":{"q":278,"f":[["1068",102,"19/06/26"],["1034",99,"11/06/26"],["1052",77,"16/06/26"]]},"Bolso Embutido":{"q":102,"f":[["1067",102,"19/06/26"]]},"Finalização":{"q":358,"f":[["985",101,"12/06/26"],["997",87,"16/06/26"],["949",70,"29/05/26"],["955",65,"29/05/26"],["996",33,"25/06/26"],["964",1,"29/05/26"]]},"Aprontamento / Revisão":{"q":17,"f":[["996",17,"18/06/26"]]}}},{"cor":"Mh285x - Azul Marinho","tam":"36","st":{"Finalização":{"q":21,"f":[["984",19,"09/06/26"],["946",2,"18/06/26"]]},"Aprontamento / Revisão":{"q":28,"f":[["984",28,"03/06/26"]]}}},{"cor":"Mh285x - Azul Marinho","tam":"38","st":{"Finalização":{"q":59,"f":[["984",29,"09/06/26"],["970",27,"12/06/26"],["980",3,"17/06/26"]]},"Travete":{"q":98,"f":[["983",98,"30/05/26"]]},"Aprontamento / Revisão":{"q":28,"f":[["984",28,"03/06/26"]]}}},{"cor":"Mh285x - Azul Marinho","tam":"40","st":{"Travete":{"q":272,"f":[["983",98,"30/05/26"],["1050",91,"19/06/26"],["989",50,"12/06/26"],["998",33,"12/06/26"]]},"Finalização":{"q":102,"f":[["959",28,"25/06/26"],["984",22,"09/06/26"],["989",18,"09/06/26"],["946",17,"18/06/26"],["970",10,"12/06/26"],["980",7,"17/06/26"]]},"Lavanderia - Amaciado":{"q":16,"f":[["989",16,"05/06/26"]]},"Aprontamento / Revisão":{"q":143,"f":[["959",66,"20/06/26"],["1000",32,"22/06/26"],["984",28,"03/06/26"],["946",17,"17/06/26"]]}}},{"cor":"Mh285x - Azul Marinho","tam":"42","st":{"Travete":{"q":937,"f":[["1008",204,"12/06/26"],["1037",160,"19/06/26"],["944",160,"08/05/26"],["983",98,"30/05/26"],["1050",91,"19/06/26"],["994",78,"19/06/26"]]},"Facção - Bolso Embutido":{"q":320,"f":[["1047",182,"15/06/26"],["1056",81,"17/06/26"],["1063",31,"22/06/26"],["944",26,"05/05/26"]]},"Finalização":{"q":93,"f":[["967",40,"29/05/26"],["980",17,"17/06/26"],["970",16,"12/06/26"],["989",14,"09/06/26"],["981",4,"25/06/26"],["946",1,"19/06/26"]]},"Aprontamento / Revisão":{"q":251,"f":[["981",108,"20/06/26"],["959",66,"20/06/26"],["1000",32,"22/06/26"],["984",28,"03/06/26"],["946",17,"17/06/26"]]},"Lavanderia - Amaciado":{"q":16,"f":[["989",16,"05/06/26"]]}}},{"cor":"Mh285x - Azul Marinho","tam":"44","st":{"Travete":{"q":1000,"f":[["1008",204,"12/06/26"],["944",160,"08/05/26"],["1037",160,"19/06/26"],["983",98,"30/05/26"],["988",96,"05/06/26"],["1050",91,"19/06/26"]]},"Lavanderia - Amaciado":{"q":16,"f":[["989",16,"05/06/26"]]},"Finalização":{"q":96,"f":[["970",26,"12/06/26"],["984",23,"09/06/26"],["946",22,"18/06/26"],["967",15,"29/05/26"],["980",4,"17/06/26"],["959",4,"25/06/26"]]},"Aprontamento / Revisão":{"q":251,"f":[["981",108,"20/06/26"],["959",66,"20/06/26"],["1000",32,"22/06/26"],["984",28,"03/06/26"],["946",17,"17/06/26"]]},"Facção - Bolso Embutido":{"q":320,"f":[["1047",182,"15/06/26"],["1056",81,"17/06/26"],["1063",31,"22/06/26"],["944",26,"05/05/26"]]}}},{"cor":"Mh285x - Azul Marinho","tam":"46","st":{"Travete":{"q":655,"f":[["1037",160,"19/06/26"],["944",160,"08/05/26"],["983",98,"30/05/26"],["1050",91,"19/06/26"],["989",50,"12/06/26"],["988",48,"05/06/26"]]},"Facção - Bolso Embutido":{"q":270,"f":[["1047",182,"15/06/26"],["1063",62,"22/06/26"],["944",26,"05/05/26"]]},"Finalização":{"q":102,"f":[["981",32,"25/06/26"],["970",26,"12/06/26"],["980",23,"17/06/26"],["967",7,"09/06/26"],["946",7,"22/06/26"],["984",6,"09/06/26"]]},"Aprontamento / Revisão":{"q":251,"f":[["981",108,"20/06/26"],["959",66,"20/06/26"],["1000",32,"22/06/26"],["984",28,"03/06/26"],["946",17,"17/06/26"]]},"Lavanderia - Amaciado":{"q":16,"f":[["989",16,"05/06/26"]]}}},{"cor":"Mh285x - Azul Marinho","tam":"48","st":{"Travete":{"q":335,"f":[["983",98,"30/05/26"],["1050",91,"19/06/26"],["989",50,"12/06/26"],["988",48,"05/06/26"],["998",33,"12/06/26"],["1001",15,"30/05/26"]]},"Finalização":{"q":91,"f":[["967",41,"29/05/26"],["946",24,"18/06/26"],["959",15,"25/06/26"],["989",11,"09/06/26"]]},"Lavanderia - Amaciado":{"q":16,"f":[["989",16,"05/06/26"]]},"Aprontamento / Revisão":{"q":115,"f":[["959",66,"20/06/26"],["1000",32,"22/06/26"],["946",17,"17/06/26"]]},"Facção - Bolso Embutido":{"q":31,"f":[["1063",31,"22/06/26"]]}}},{"cor":"Pr02 - Preto","tam":"36","st":{"Finalização":{"q":6,"f":[["972",3,"11/06/26"],["962",2,"05/06/26"],["1011",1,"25/06/26"]]}}},{"cor":"Pr02 - Preto","tam":"38","st":{"Travete":{"q":180,"f":[["1024",82,"12/06/26"],["1025",70,"19/06/26"],["992",28,"05/06/26"]]},"Finalização":{"q":67,"f":[["1027",27,"25/06/26"],["1004",18,"17/06/26"],["972",11,"11/06/26"],["952",9,"04/06/26"],["990",1,"12/06/26"],["951",1,"29/05/26"]]},"Aprontamento / Revisão":{"q":112,"f":[["1041",84,"24/06/26"],["1027",14,"19/06/26"],["952",14,"30/05/26"]]},"Facção - Bolso Embutido":{"q":350,"f":[["1062",88,"19/06/26"],["1058",84,"18/06/26"],["1061",83,"19/06/26"],["1042",67,"19/06/26"],["1024",28,"06/06/26"]]}}},{"cor":"Pr02 - Preto","tam":"40","st":{"Finalização":{"q":106,"f":[["1011",31,"25/06/26"],["972",16,"11/06/26"],["962",15,"04/06/26"],["1027",12,"25/06/26"],["1004",11,"17/06/26"],["952",10,"04/06/26"]]},"Aprontamento / Revisão":{"q":190,"f":[["1041",84,"24/06/26"],["1011",62,"19/06/26"],["1000",16,"22/06/26"],["952",14,"30/05/26"],["1027",14,"19/06/26"]]},"Travete":{"q":497,"f":[["1013",144,"05/06/26"],["1033",89,"19/06/26"],["1020",84,"19/06/26"],["1024",82,"12/06/26"],["1025",70,"19/06/26"],["992",28,"05/06/26"]]},"Facção - Bolso Embutido":{"q":545,"f":[["1030",99,"05/06/26"],["1031",96,"11/06/26"],["1062",88,"19/06/26"],["1058",84,"18/06/26"],["1061",83,"19/06/26"],["1042",67,"19/06/26"]]}}},{"cor":"Pr02 - Preto","tam":"42","st":{"Facção - Bolso Embutido":{"q":1162,"f":[["1057",255,"19/06/26"],["1046",162,"15/06/26"],["1045",158,"12/06/26"],["1030",99,"05/06/26"],["1031",96,"11/06/26"],["1062",88,"19/06/26"]]},"Finalização":{"q":124,"f":[["986",30,"16/06/26"],["962",22,"05/06/26"],["1004",18,"17/06/26"],["951",17,"29/05/26"],["1005",15,"25/06/26"],["1027",6,"25/06/26"]]},"Travete":{"q":1225,"f":[["995",252,"19/06/26"],["1016",208,"12/06/26"],["1013",144,"05/06/26"],["1017",132,"12/06/26"],["1033",89,"19/06/26"],["1020",84,"19/06/26"]]},"Aprontamento / Revisão":{"q":226,"f":[["1041",84,"24/06/26"],["1011",62,"19/06/26"],["966",20,"13/06/26"],["1000",16,"22/06/26"],["986",16,"11/06/26"],["1027",14,"19/06/26"]]}}},{"cor":"Pr02 - Preto","tam":"44","st":{"Finalização":{"q":189,"f":[["1005",69,"25/06/26"],["990",44,"12/06/26"],["986",20,"16/06/26"],["966",17,"19/06/26"],["1011",15,"25/06/26"],["952",9,"04/06/26"]]},"Aprontamento / Revisão":{"q":242,"f":[["1041",84,"24/06/26"],["1011",62,"19/06/26"],["986",32,"11/06/26"],["966",20,"13/06/26"],["1000",16,"22/06/26"],["952",14,"30/05/26"]]},"Travete":{"q":1241,"f":[["995",252,"19/06/26"],["1016",208,"12/06/26"],["1013",144,"05/06/26"],["1017",132,"12/06/26"],["1033",89,"19/06/26"],["1020",84,"19/06/26"]]},"Facção - Bolso Embutido":{"q":1341,"f":[["1057",255,"19/06/26"],["1030",198,"05/06/26"],["1046",162,"15/06/26"],["1045",158,"12/06/26"],["1031",96,"11/06/26"],["1062",88,"19/06/26"]]}}},{"cor":"Pr02 - Preto","tam":"46","st":{"Facção - Bolso Embutido":{"q":945,"f":[["1046",162,"15/06/26"],["1045",158,"12/06/26"],["1030",99,"05/06/26"],["1031",96,"11/06/26"],["1062",88,"19/06/26"],["1058",84,"18/06/26"]]},"Travete":{"q":853,"f":[["1016",208,"12/06/26"],["1013",144,"05/06/26"],["1017",132,"12/06/26"],["1033",89,"19/06/26"],["1020",84,"19/06/26"],["1024",82,"12/06/26"]]},"Finalização":{"q":371,"f":[["1005",112,"25/06/26"],["1011",59,"25/06/26"],["951",50,"29/05/26"],["962",37,"05/06/26"],["1004",30,"17/06/26"],["952",24,"04/06/26"]]},"Aprontamento / Revisão":{"q":226,"f":[["1041",84,"24/06/26"],["1011",62,"19/06/26"],["966",20,"13/06/26"],["1000",16,"22/06/26"],["986",16,"11/06/26"],["1027",14,"19/06/26"]]}}},{"cor":"Pr02 - Preto","tam":"48","st":{"Finalização":{"q":487,"f":[["962",75,"04/06/26"],["1004",75,"17/06/26"],["951",70,"29/05/26"],["966",68,"17/06/26"],["952",54,"04/06/26"],["1027",41,"25/06/26"]]},"Aprontamento / Revisão":{"q":164,"f":[["1041",84,"24/06/26"],["966",20,"13/06/26"],["986",16,"11/06/26"],["1000",16,"22/06/26"],["952",14,"30/05/26"],["1027",14,"19/06/26"]]},"Travete":{"q":285,"f":[["1033",89,"19/06/26"],["1024",82,"12/06/26"],["1025",70,"19/06/26"],["992",28,"05/06/26"],["1001",16,"30/05/26"]]},"Facção - Bolso Embutido":{"q":526,"f":[["1031",96,"11/06/26"],["1062",88,"19/06/26"],["1058",84,"18/06/26"],["1061",83,"19/06/26"],["1049",80,"23/06/26"],["1042",67,"19/06/26"]]}}},{"cor":"Pr02 - Preto","tam":"50","st":{"Finalização":{"q":2,"f":[["952",2,"04/06/26"]]}}},{"cor":"Vd1001 - Verde Militar","tam":"40","st":{"Finalização":{"q":48,"f":[["999",48,"19/06/26"]]}}},{"cor":"Vd1001 - Verde Militar","tam":"42","st":{"Finalização":{"q":3,"f":[["999",3,"19/06/26"]]},"Facção - Bolso Embutido":{"q":268,"f":[["1029",96,"05/06/26"],["1048",94,"15/06/26"],["1064",45,"22/06/26"],["1063",33,"22/06/26"]]},"Aprontamento / Revisão":{"q":158,"f":[["1010",158,"23/06/26"]]}}},{"cor":"Vd1001 - Verde Militar","tam":"44","st":{"Facção - Bolso Embutido":{"q":268,"f":[["1029",96,"05/06/26"],["1048",94,"15/06/26"],["1064",45,"22/06/26"],["1063",33,"22/06/26"]]},"Aprontamento / Revisão":{"q":158,"f":[["1010",158,"23/06/26"]]},"Finalização":{"q":23,"f":[["999",23,"19/06/26"]]}}},{"cor":"Vd1001 - Verde Militar","tam":"46","st":{"Finalização":{"q":27,"f":[["999",27,"19/06/26"]]},"Facção - Bolso Embutido":{"q":536,"f":[["1029",192,"05/06/26"],["1048",188,"15/06/26"],["1064",90,"22/06/26"],["1063",66,"22/06/26"]]},"Aprontamento / Revisão":{"q":158,"f":[["1010",158,"23/06/26"]]}}},{"cor":"Vd1001 - Verde Militar","tam":"48","st":{"Facção - Bolso Embutido":{"q":268,"f":[["1029",96,"05/06/26"],["1048",94,"15/06/26"],["1064",45,"22/06/26"],["1063",33,"22/06/26"]]},"Finalização":{"q":20,"f":[["999",20,"19/06/26"]]}}}]},{"nome":"Bermuda embutido hud telfa","q":4005,"rows":[{"cor":"Be404 -  Areia","tam":"36","st":{"Finalização":{"q":2,"f":[["964",1,"29/05/26"],["975",1,"05/06/26"]]},"Aprontamento / Revisão":{"q":22,"f":[["965",22,"20/05/26"]]}}},{"cor":"Be404 -  Areia","tam":"38","st":{"Finalização":{"q":6,"f":[["964",3,"29/05/26"],["975",2,"05/06/26"],["965",1,"05/06/26"]]},"Lavanderia - Amaciado":{"q":24,"f":[["1003",24,"19/06/26"]]},"Aprontamento / Revisão":{"q":22,"f":[["965",22,"20/05/26"]]}}},{"cor":"Be404 -  Areia","tam":"40","st":{"Finalização":{"q":30,"f":[["968",28,"10/06/26"],["965",1,"05/06/26"],["975",1,"05/06/26"]]},"Lavanderia - Amaciado":{"q":24,"f":[["1003",24,"19/06/26"]]},"Bolso Embutido":{"q":84,"f":[["1038",84,"10/06/26"]]}}},{"cor":"Be404 -  Areia","tam":"42","st":{"Bolso Embutido":{"q":172,"f":[["1055",88,"18/06/26"],["1038",84,"10/06/26"]]},"Finalização":{"q":8,"f":[["968",4,"10/06/26"],["975",2,"05/06/26"],["964",1,"29/05/26"],["965",1,"05/06/26"]]},"Lavanderia - Amaciado":{"q":24,"f":[["1003",24,"19/06/26"]]}}},{"cor":"Be404 -  Areia","tam":"44","st":{"Finalização":{"q":9,"f":[["964",4,"29/05/26"],["975",4,"05/06/26"],["968",1,"10/06/26"]]},"Lavanderia - Amaciado":{"q":24,"f":[["1003",24,"19/06/26"]]},"Bolso Embutido":{"q":172,"f":[["1055",88,"18/06/26"],["1038",84,"10/06/26"]]}}},{"cor":"Be404 -  Areia","tam":"46","st":{"Bolso Embutido":{"q":88,"f":[["1055",88,"18/06/26"]]},"Finalização":{"q":20,"f":[["975",19,"05/06/26"],["968",1,"10/06/26"]]},"Lavanderia - Amaciado":{"q":24,"f":[["1003",24,"19/06/26"]]}}},{"cor":"Be404 -  Areia","tam":"48","st":{"Bolso Embutido":{"q":88,"f":[["1055",88,"18/06/26"]]}}},{"cor":"Be430x - Creme","tam":"36","st":{"Finalização":{"q":11,"f":[["974",11,"19/06/26"]]}}},{"cor":"Be430x - Creme","tam":"38","st":{"Finalização":{"q":4,"f":[["1003",4,"19/06/26"]]},"Bolso Embutido":{"q":38,"f":[["1022",20,"05/06/26"],["1023",18,"05/06/26"]]}}},{"cor":"Be430x - Creme","tam":"40","st":{"Bolso Embutido":{"q":38,"f":[["1022",20,"05/06/26"],["1023",18,"05/06/26"]]},"Finalização":{"q":24,"f":[["968",21,"29/05/26"],["974",2,"19/06/26"],["1003",1,"19/06/26"]]}}},{"cor":"Be430x - Creme","tam":"42","st":{"Finalização":{"q":3,"f":[["974",3,"19/06/26"]]},"Bolso Embutido":{"q":38,"f":[["1022",20,"05/06/26"],["1023",18,"05/06/26"]]}}},{"cor":"Be430x - Creme","tam":"44","st":{"Bolso Embutido":{"q":38,"f":[["1022",20,"05/06/26"],["1023",18,"05/06/26"]]},"Finalização":{"q":10,"f":[["968",5,"29/05/26"],["1003",3,"19/06/26"],["974",2,"19/06/26"]]}}},{"cor":"Be430x - Creme","tam":"46","st":{"Finalização":{"q":26,"f":[["974",14,"19/06/26"],["1003",11,"19/06/26"],["968",1,"29/05/26"]]},"Bolso Embutido":{"q":38,"f":[["1022",20,"05/06/26"],["1023",18,"05/06/26"]]}}},{"cor":"Be430x - Creme","tam":"48","st":{"Bolso Embutido":{"q":38,"f":[["1022",20,"05/06/26"],["1023",18,"05/06/26"]]}}},{"cor":"Cz14 - Cinza claro","tam":"36","st":{"Finalização":{"q":11,"f":[["973",11,"12/06/26"]]}}},{"cor":"Cz14 - Cinza claro","tam":"38","st":{"Travete":{"q":21,"f":[["1003",21,"19/06/26"]]},"Finalização":{"q":20,"f":[["964",18,"29/05/26"],["968",2,"02/06/26"]]}}},{"cor":"Cz14 - Cinza claro","tam":"40","st":{"Finalização":{"q":54,"f":[["968",53,"29/05/26"],["973",1,"12/06/26"]]},"Travete":{"q":21,"f":[["1003",21,"19/06/26"]]}}},{"cor":"Cz14 - Cinza claro","tam":"42","st":{"Finalização":{"q":15,"f":[["964",8,"29/05/26"],["968",6,"29/05/26"],["973",1,"12/06/26"]]},"Travete":{"q":21,"f":[["1003",21,"19/06/26"]]}}},{"cor":"Cz14 - Cinza claro","tam":"44","st":{"Finalização":{"q":7,"f":[["968",7,"29/05/26"]]},"Travete":{"q":21,"f":[["1003",21,"19/06/26"]]}}},{"cor":"Cz14 - Cinza claro","tam":"46","st":{"Finalização":{"q":22,"f":[["968",13,"29/05/26"],["973",9,"12/06/26"]]},"Travete":{"q":21,"f":[["1003",21,"19/06/26"]]}}},{"cor":"Cz14 - Cinza claro","tam":"48","st":{"Finalização":{"q":2,"f":[["968",2,"29/05/26"]]}}},{"cor":"Cz293x - Caqui claro","tam":"36","st":{"Finalização":{"q":19,"f":[["965",19,"26/05/26"]]}}},{"cor":"Cz293x - Caqui claro","tam":"38","st":{"Finalização":{"q":16,"f":[["964",14,"29/05/26"],["965",2,"26/05/26"]]},"Travete":{"q":23,"f":[["1003",23,"19/06/26"]]}}},{"cor":"Cz293x - Caqui claro","tam":"40","st":{"Travete":{"q":23,"f":[["1003",23,"19/06/26"]]},"Finalização":{"q":5,"f":[["964",5,"29/05/26"]]},"Bolso Embutido":{"q":126,"f":[["1054",126,"18/06/26"]]}}},{"cor":"Cz293x - Caqui claro","tam":"42","st":{"Bolso Embutido":{"q":126,"f":[["1054",126,"18/06/26"]]},"Facção - Bolso Embutido":{"q":78,"f":[["1021",78,"17/06/26"]]},"Finalização":{"q":14,"f":[["964",14,"29/05/26"]]},"Travete":{"q":23,"f":[["1003",23,"19/06/26"]]}}},{"cor":"Cz293x - Caqui claro","tam":"44","st":{"Travete":{"q":23,"f":[["1003",23,"19/06/26"]]},"Finalização":{"q":14,"f":[["964",14,"29/05/26"]]},"Facção - Bolso Embutido":{"q":78,"f":[["1021",78,"17/06/26"]]}}},{"cor":"Cz293x - Caqui claro","tam":"46","st":{"Facção - Bolso Embutido":{"q":78,"f":[["1021",78,"17/06/26"]]},"Finalização":{"q":8,"f":[["964",8,"29/05/26"]]},"Travete":{"q":23,"f":[["1003",23,"19/06/26"]]}}},{"cor":"Cz293x - Caqui claro","tam":"48","st":{"Finalização":{"q":1,"f":[["964",1,"29/05/26"]]}}},{"cor":"Mh285x - Azul Marinho","tam":"36","st":{"Finalização":{"q":100,"f":[["965",95,"26/05/26"],["973",5,"12/06/26"]]}}},{"cor":"Mh285x - Azul Marinho","tam":"38","st":{"Finalização":{"q":3,"f":[["965",2,"26/05/26"],["1003",1,"19/06/26"]]}}},{"cor":"Mh285x - Azul Marinho","tam":"40","st":{"Finalização":{"q":26,"f":[["968",22,"29/05/26"],["973",4,"12/06/26"]]}}},{"cor":"Mh285x - Azul Marinho","tam":"42","st":{"Facção - Bolso Embutido":{"q":78,"f":[["1021",78,"17/06/26"]]}}},{"cor":"Mh285x - Azul Marinho","tam":"44","st":{"Facção - Bolso Embutido":{"q":78,"f":[["1021",78,"17/06/26"]]},"Finalização":{"q":15,"f":[["1003",8,"19/06/26"],["968",7,"29/05/26"]]}}},{"cor":"Mh285x - Azul Marinho","tam":"46","st":{"Finalização":{"q":32,"f":[["1003",18,"19/06/26"],["973",13,"12/06/26"],["968",1,"29/05/26"]]},"Facção - Bolso Embutido":{"q":78,"f":[["1021",78,"17/06/26"]]}}},{"cor":"Pr02 - Preto","tam":"36","st":{"Finalização":{"q":83,"f":[["965",33,"29/05/26"],["975",32,"26/05/26"],["973",18,"11/06/26"]]},"Lavanderia - Amaciado":{"q":20,"f":[["974",20,"19/06/26"]]}}},{"cor":"Pr02 - Preto","tam":"38","st":{"Finalização":{"q":61,"f":[["975",39,"26/05/26"],["973",11,"11/06/26"],["964",7,"26/05/26"],["965",4,"29/05/26"]]},"Lavanderia - Amaciado":{"q":42,"f":[["1003",22,"19/06/26"],["974",20,"19/06/26"]]},"Bolso Embutido":{"q":40,"f":[["1022",20,"05/06/26"],["1023",20,"05/06/26"]]}}},{"cor":"Pr02 - Preto","tam":"40","st":{"Bolso Embutido":{"q":100,"f":[["1054",60,"18/06/26"],["1023",20,"05/06/26"],["1022",20,"05/06/26"]]},"Lavanderia - Amaciado":{"q":42,"f":[["1003",22,"19/06/26"],["974",20,"19/06/26"]]},"Finalização":{"q":36,"f":[["975",26,"26/05/26"],["968",10,"25/05/26"]]}}},{"cor":"Pr02 - Preto","tam":"42","st":{"Finalização":{"q":36,"f":[["964",16,"26/05/26"],["968",10,"25/05/26"],["975",9,"05/06/26"],["965",1,"29/05/26"]]},"Lavanderia - Amaciado":{"q":42,"f":[["1003",22,"19/06/26"],["974",20,"19/06/26"]]},"Bolso Embutido":{"q":158,"f":[["1054",60,"18/06/26"],["1055",58,"18/06/26"],["1022",20,"05/06/26"],["1023",20,"05/06/26"]]}}},{"cor":"Pr02 - Preto","tam":"44","st":{"Bolso Embutido":{"q":98,"f":[["1055",58,"18/06/26"],["1023",20,"05/06/26"],["1022",20,"05/06/26"]]},"Lavanderia - Amaciado":{"q":42,"f":[["1003",22,"19/06/26"],["974",20,"19/06/26"]]},"Finalização":{"q":31,"f":[["975",21,"05/06/26"],["968",10,"25/05/26"]]}}},{"cor":"Pr02 - Preto","tam":"46","st":{"Finalização":{"q":50,"f":[["975",32,"05/06/26"],["973",14,"11/06/26"],["964",4,"26/05/26"]]},"Lavanderia - Amaciado":{"q":42,"f":[["1003",22,"19/06/26"],["974",20,"19/06/26"]]},"Bolso Embutido":{"q":98,"f":[["1055",58,"18/06/26"],["1022",20,"05/06/26"],["1023",20,"05/06/26"]]}}},{"cor":"Pr02 - Preto","tam":"48","st":{"Bolso Embutido":{"q":98,"f":[["1055",58,"18/06/26"],["1023",20,"05/06/26"],["1022",20,"05/06/26"]]},"Finalização":{"q":1,"f":[["964",1,"26/05/26"]]}}},{"cor":"Vd1001 - Verde Militar","tam":"38","st":{"Finalização":{"q":24,"f":[["964",24,"25/05/26"]]},"Travete":{"q":23,"f":[["1003",23,"19/06/26"]]},"Bolso Embutido":{"q":40,"f":[["1022",20,"05/06/26"],["1023",20,"05/06/26"]]}}},{"cor":"Vd1001 - Verde Militar","tam":"40","st":{"Bolso Embutido":{"q":40,"f":[["1023",20,"05/06/26"],["1022",20,"05/06/26"]]},"Travete":{"q":23,"f":[["1003",23,"19/06/26"]]}}},{"cor":"Vd1001 - Verde Militar","tam":"42","st":{"Finalização":{"q":32,"f":[["964",32,"25/05/26"]]},"Travete":{"q":23,"f":[["1003",23,"19/06/26"]]},"Bolso Embutido":{"q":40,"f":[["1022",20,"05/06/26"],["1023",20,"05/06/26"]]}}},{"cor":"Vd1001 - Verde Militar","tam":"44","st":{"Bolso Embutido":{"q":40,"f":[["1023",20,"05/06/26"],["1022",20,"05/06/26"]]},"Travete":{"q":23,"f":[["1003",23,"19/06/26"]]},"Finalização":{"q":1,"f":[["964",1,"25/05/26"]]}}},{"cor":"Vd1001 - Verde Militar","tam":"46","st":{"Travete":{"q":23,"f":[["1003",23,"19/06/26"]]},"Bolso Embutido":{"q":40,"f":[["1022",20,"05/06/26"],["1023",20,"05/06/26"]]}}},{"cor":"Vd1001 - Verde Militar","tam":"48","st":{"Bolso Embutido":{"q":40,"f":[["1023",20,"05/06/26"],["1022",20,"05/06/26"]]}}}]},{"nome":"CALÇA EMBUTIDO SANDY BW PLUS","q":1316,"rows":[{"cor":"BWPLUS - CARBONO","tam":"40","st":{"Aprontamento / Revisão":{"q":174,"f":[["1012",174,"23/06/26"]]}}},{"cor":"BWPLUS - CARBONO","tam":"42","st":{"Aprontamento / Revisão":{"q":174,"f":[["1012",174,"23/06/26"]]}}},{"cor":"BWPLUS - CARBONO","tam":"44","st":{"Aprontamento / Revisão":{"q":174,"f":[["1012",174,"23/06/26"]]}}},{"cor":"BWPLUS - CARBONO","tam":"46","st":{"Aprontamento / Revisão":{"q":174,"f":[["1012",174,"23/06/26"]]}}},{"cor":"JC - Jeans Clara","tam":"40","st":{"Travete":{"q":124,"f":[["1006",124,"12/06/26"]]}}},{"cor":"JC - Jeans Clara","tam":"42","st":{"Travete":{"q":124,"f":[["1006",124,"12/06/26"]]}}},{"cor":"JC - Jeans Clara","tam":"44","st":{"Travete":{"q":248,"f":[["1006",248,"12/06/26"]]}}},{"cor":"JC - Jeans Clara","tam":"46","st":{"Travete":{"q":124,"f":[["1006",124,"12/06/26"]]}}}]},{"nome":"Short Mauricinho Twill","q":990,"rows":[{"cor":"Be404 -  Areia","tam":"G","st":{"Aguardando início":{"q":79,"f":[["1071",33,"—"],["1009",24,"—"],["1053",22,"—"]]}}},{"cor":"Be404 -  Areia","tam":"M","st":{"Aguardando início":{"q":79,"f":[["1071",33,"—"],["1009",24,"—"],["1053",22,"—"]]}}},{"cor":"Be404 -  Areia","tam":"P","st":{"Aguardando início":{"q":46,"f":[["1009",24,"—"],["1053",22,"—"]]}}},{"cor":"Be430x - Creme","tam":"G","st":{"Aguardando início":{"q":79,"f":[["1071",33,"—"],["1009",24,"—"],["1053",22,"—"]]}}},{"cor":"Be430x - Creme","tam":"M","st":{"Aguardando início":{"q":79,"f":[["1071",33,"—"],["1009",24,"—"],["1053",22,"—"]]}}},{"cor":"Be430x - Creme","tam":"P","st":{"Aguardando início":{"q":46,"f":[["1009",24,"—"],["1053",22,"—"]]}}},{"cor":"Mh285x - Azul Marinho","tam":"G","st":{"Aguardando início":{"q":81,"f":[["1071",33,"—"],["1009",26,"—"],["1053",22,"—"]]}}},{"cor":"Mh285x - Azul Marinho","tam":"M","st":{"Aguardando início":{"q":81,"f":[["1071",33,"—"],["1009",26,"—"],["1053",22,"—"]]}}},{"cor":"Mh285x - Azul Marinho","tam":"P","st":{"Aguardando início":{"q":48,"f":[["1009",26,"—"],["1053",22,"—"]]}}},{"cor":"Pr02 - Preto","tam":"G","st":{"Aguardando início":{"q":77,"f":[["1071",33,"—"],["1009",24,"—"],["1053",20,"—"]]}}},{"cor":"Pr02 - Preto","tam":"M","st":{"Aguardando início":{"q":77,"f":[["1071",33,"—"],["1009",24,"—"],["1053",20,"—"]]}}},{"cor":"Pr02 - Preto","tam":"P","st":{"Aguardando início":{"q":44,"f":[["1009",24,"—"],["1053",20,"—"]]}}},{"cor":"Vd1001 - Verde Militar","tam":"G","st":{"Aguardando início":{"q":69,"f":[["1071",33,"—"],["1053",22,"—"],["1009",14,"—"]]}}},{"cor":"Vd1001 - Verde Militar","tam":"M","st":{"Aguardando início":{"q":69,"f":[["1071",33,"—"],["1053",22,"—"],["1009",14,"—"]]}}},{"cor":"Vd1001 - Verde Militar","tam":"P","st":{"Aguardando início":{"q":36,"f":[["1053",22,"—"],["1009",14,"—"]]}}}]}]};
+const STCOLORS={'Aguardando início':'#94a3b8','Corte':'#6366f1','Bolso Embutido':'#0ea5e9',
+ 'Facção - Bolso Embutido':'#06b6d4','Facção - Jeans Tradicional':'#14b8a6','Travete':'#f59e0b',
+ 'Lavanderia - Amaciado':'#a855f7','Aprontamento / Revisão':'#ec4899','Finalização':'#22c55e'};
+// Tempo médio em cada estágio (dias) — Dapic 01/05→26/06, finalização − envio, ponderado por qtd
+const STAGE_AVG={"Corte":0.0,"Bolso Embutido":1.7,"Facção - Bolso Embutido":9.8,"Facção - Jeans Tradicional":7.1,"Travete":11.3,"Lavanderia - Amaciado":0.7,"Aprontamento / Revisão":6.3,"Finalização":0.1};
+const PATH_PROD=['Corte','Bolso Embutido','Facção - Bolso Embutido','Travete','Lavanderia - Amaciado','Aprontamento / Revisão','Finalização'];
+const LEAD_TIME=PATH_PROD.reduce((s,k)=>s+(STAGE_AVG[k]||0),0);
+let PTIP=[];
+
+function renderProducao(){
+  if(!PROD_DATA) return;
+  const D=PROD_DATA;
+  // KPIs
+  document.getElementById("pkpis").innerHTML=`
+    <div class="kpi"><div class="n">${D.total.toLocaleString('pt-BR')}</div><div class="l">Peças em produção</div></div>
+    <div class="kpi"><div class="n">${D.fichasAtivas}</div><div class="l">Fichas (OPs) ativas</div></div>
+    <div class="kpi"><div class="n">${D.products.length}</div><div class="l">Produtos</div></div>
+    <div class="kpi"><div class="n">~${LEAD_TIME.toFixed(0)}d</div><div class="l">Lead time médio (corte→final)</div></div>`;
+  // Funnel — peças e tempo médio por etapa
+  const maxS=Math.max(...D.stages.map(s=>D.stageTot[s]));
+  document.getElementById("funnel").innerHTML=D.stages.map(s=>{
+    const v=D.stageTot[s], w=(v/maxS*100).toFixed(1), c=STCOLORS[s]||'#2563eb';
+    const t=STAGE_AVG[s], slow=t!=null&&t>=7;
+    const ttxt=t!=null?`⏱ ${t.toLocaleString('pt-BR')}d`:'';
+    return `<div class="funnel-row"><div class="fl-name">${s}</div>
+      <div class="fl-track"><div class="fl-bar" style="width:${w}%;background:${c}"></div></div>
+      <div class="fl-val">${v.toLocaleString('pt-BR')}</div>
+      <div class="fl-avg ${slow?'slow':''}">${ttxt}</div></div>`;
+  }).join("");
+  const lt=document.getElementById("ltlabel"); if(lt) lt.textContent=LEAD_TIME.toFixed(0)+' dias';
+  // Head
+  document.getElementById("pthead").innerHTML=
+    `<th class="l">SKU · Tam</th>`+D.stages.map(s=>`<th title="${s}">${s.replace('Facção - ','Facção ').replace(' - Amaciado','')}</th>`).join("")+`<th>Total</th><th class="l">Nota vs venda</th>`;
+  renderProdBody();
+}
+
+// ---- Mapeamento produção → venda (consumo C. Mensal do estoque) ----
+// Regra alinhada com o cliente: o tipo da sarja não muda o produto.
+// Areia→AR, Preto→P, Azul Marinho→AZM, Caqui→CQ, Verde Militar→VD,
+// Cinza claro→CZC (Cinza Clara), Creme→CE (Creme Escuro). Bermuda→B.{cor}. Sandy→C-JBE-{AZE/AZC}.
+function corCode(cor){
+  const c=(cor||'').toLowerCase();
+  if(c.includes('areia'))  return 'AR';
+  if(c.includes('pret'))   return 'P';
+  if(c.includes('marinho')||c.includes('azul')) return 'AZM';
+  if(c.includes('caqui'))  return 'CQ';
+  if(c.includes('verde'))  return 'VD';
+  if(c.includes('cinza'))  return 'CZC';
+  if(c.includes('creme'))  return 'CE';
+  return null;
+}
+function prodSku(produto,cor,tam){
+  const p=(produto||'').toLowerCase(), c=(cor||'').toLowerCase();
+  if(p.includes('sandy')){                       // Calça Embutido Sandy → Jeans Bolso Embutido
+    if(c.includes('carbono')) return 'C-JBE-AZE-'+tam;
+    if(c.includes('jeans')||c.includes('clara')) return 'C-JBE-AZC-'+tam;
+    return null;
+  }
+  if(p.includes('mauricinho')||p.includes('short')) return null; // sem equivalente de venda
+  const code=corCode(cor); if(!code) return null;
+  if(p.includes('bermuda')) return 'B.'+code+'-'+tam;  // Bermuda de Sarja
+  return 'C-'+code+'-'+tam;                            // Calça de Sarja
+}
+// Consumo de venda (C. Mensal) das famílias não carregadas no seed do estoque — extraído da planilha Visão Geral
+const CONSUMO_EXTRA={
+ "C-CE-36":46,"C-CE-38":84,"C-CE-40":192,"C-CE-42":284,"C-CE-44":213,"C-CE-46":169,"C-CE-48":127,"C-CE-50":2,"C-CE-52":1,
+ "C-CZC-36":33,"C-CZC-38":279,"C-CZC-40":695,"C-CZC-42":785,"C-CZC-44":888,"C-CZC-46":500,"C-CZC-48":194,"C-CZC-50":10,"C-CZC-52":2,
+ "B.AR-36":14,"B.AR-38":32,"B.AR-40":61,"B.AR-42":95,"B.AR-44":77,"B.AR-46":36,"B.AR-48":21,"B.AR-50":1,
+ "B.P-36":21,"B.P-38":27,"B.P-40":62,"B.P-42":56,"B.P-44":46,"B.P-46":60,"B.P-48":17,"B.P-50":4,
+ "B.CQ-36":9,"B.CQ-38":16,"B.CQ-40":28,"B.CQ-42":50,"B.CQ-44":54,"B.CQ-46":34,"B.CQ-48":12,"B.CQ-50":2,
+ "B.AZM-36":12,"B.AZM-38":20,"B.AZM-40":61,"B.AZM-42":81,"B.AZM-44":68,"B.AZM-46":52,"B.AZM-48":13,"B.AZM-50":5,"B.AZM-52":1,
+ "B.CE-36":13,"B.CE-38":14,"B.CE-40":43,"B.CE-42":50,"B.CE-44":38,"B.CE-46":22,"B.CE-48":5,"B.CE-50":2,
+ "B.VD-36":11,"B.VD-38":18,"B.VD-40":29,"B.VD-42":50,"B.VD-44":33,"B.VD-46":25,"B.VD-48":17,
+ "B.CZC-36":1,"B.CZC-38":3,"B.CZC-40":1,"B.CZC-42":8,"B.CZC-44":10,"B.CZC-46":2,"B.CZC-48":2,
+ "C-JBE-AZC-36":27,"C-JBE-AZC-38":62,"C-JBE-AZC-40":135,"C-JBE-AZC-42":123,"C-JBE-AZC-44":195,"C-JBE-AZC-46":82,"C-JBE-AZC-48":1,
+ "C-JBE-AZE-36":26,"C-JBE-AZE-38":52,"C-JBE-AZE-40":73,"C-JBE-AZE-42":109,"C-JBE-AZE-44":136,"C-JBE-AZE-46":80
+};
+function prodHex(cor){
+  const c=(cor||'').toLowerCase();
+  if(c.includes('areia')) return '#d9c7a3';
+  if(c.includes('creme')) return '#e8dcc0';
+  if(c.includes('cinza')) return '#b0b4ba';
+  if(c.includes('caqui')) return '#b39c6e';
+  if(c.includes('azul'))  return '#1e3a5f';
+  if(c.includes('pret'))  return '#222222';
+  if(c.includes('verde')) return '#4b5320';
+  if(c.includes('carbono'))return '#3a3a3a';
+  if(c.includes('jeans')) return '#6b8fb5';
+  return '#9ca3af';
+}
+function consumoVenda(produto,cor,tam){
+  const sku=prodSku(produto,cor,tam); if(!sku) return null;
+  if(saidasMap&&saidasMap[sku]!=null) return saidasMap[sku];
+  const d=DATA.find(x=>x.sku===sku); if(d) return d.cmensal;
+  if(CONSUMO_EXTRA[sku]!=null) return CONSUMO_EXTRA[sku];
+  return null;
+}
+// Nota: a produção em curso está de acordo com o consumo de venda?
+function notaProducao(qtyProd,cmensal){
+  if(cmensal==null) return {txt:'sem referência de venda',cls:'n-na'};
+  if(cmensal<=0)    return {txt:'venda ~0 — avaliar',cls:'n-na'};
+  const dias=Math.round(qtyProd/(cmensal/30)); // dias de venda cobertos pela produção atual
+  if(dias<15) return {txt:`Fabricar mais · cobre ${dias}d de venda`,cls:'n-mais'};
+  if(dias>60) return {txt:`Fabricar menos · ${dias}d de venda em produção`,cls:'n-menos'};
+  return {txt:`Em linha · ${dias}d de venda`,cls:'n-ok'};
+}
+
+// Comparação grade de venda × grade de produção (curva de tamanhos)
+function gradeBlock(prodNome,g){
+  const sizes=g.rows.map(r=>r.tam);
+  const venda=g.rows.map(r=>consumoVenda(prodNome,r.cor,r.tam)||0);
+  const prod=g.rows.map(r=>Object.values(r.st).reduce((a,c)=>a+c.q,0));
+  const maxV=Math.max(1,...venda), maxP=Math.max(1,...prod);
+  const sumV=venda.reduce((a,b)=>a+b,0), sumP=prod.reduce((a,b)=>a+b,0);
+  const dv=venda.map(x=>sumV?x/sumV:0), dp=prod.map(x=>sumP?x/sumP:0);
+  const tvd=0.5*dv.reduce((a,_,i)=>a+Math.abs(dv[i]-dp[i]),0);
+  const adesao=Math.round((1-tvd)*100);
+  // dispersão (coef. de variação) p/ detectar "tamanhos muito iguais"
+  const cv=(arr)=>{const n=arr.length,m=arr.reduce((a,b)=>a+b,0)/n;if(m<=0)return 0;return Math.sqrt(arr.reduce((a,b)=>a+(b-m)**2,0)/n)/m;};
+  const cvV=cv(venda), cvP=cv(prod);
+  let verdict,vcls;
+  if(sumP===0){verdict='sem produção nesta cor';vcls='n-na';}
+  else if(sumV===0){verdict='sem venda de referência';vcls='n-na';}
+  else if(adesao>=80){verdict=`grade alinhada (${adesao}%)`;vcls='n-ok';}
+  else if(cvP < cvV*0.6){verdict=`cortando tamanhos iguais demais (${adesao}%)`;vcls='n-menos';}
+  else {verdict=`grade desalinhada com a venda (${adesao}%)`;vcls='n-mais';}
+  const bars=(arr,max,color)=>sizes.map((s,i)=>`<div class="gcol" title="${s}: ${arr[i].toLocaleString('pt-BR')}"><div class="gtrack"><i style="height:${Math.round(arr[i]/max*100)}%;background:${color}"></i></div><span>${s}</span></div>`).join('');
+  return `<div class="gpair">
+    <div class="gchart"><div class="gtit">📈 Grade de VENDA (C. Mensal)</div><div class="gbars">${bars(venda,maxV,'#2563eb')}</div></div>
+    <div class="gchart"><div class="gtit">🏭 Grade de PRODUÇÃO (em produção)</div><div class="gbars">${bars(prod,maxP,'#f59e0b')}</div></div>
+    <div class="gverdict"><span class="npill ${vcls}">${verdict}</span><div class="note">A produção deveria seguir a mesma curva de tamanhos da venda.</div></div>
+  </div>`;
+}
+
+function renderProdBody(){
+  const D=PROD_DATA, q=document.getElementById("pq").value.trim().toLowerCase();
+  const tb=document.getElementById("ptbody"); tb.innerHTML=""; PTIP=[];
+  const ncol=D.stages.length+3; // tamanho + etapas + total + nota
+  D.products.forEach(p=>{
+    let rows=p.rows;
+    const fichasMatch=(r)=>Object.values(r.st).some(c=>c.f.some(f=>String(f[0]).includes(q)));
+    if(q) rows=rows.filter(r=>(p.nome.toLowerCase().includes(q)||(r.cor+' '+r.tam).toLowerCase().includes(q)||fichasMatch(r)));
+    if(!rows.length) return;
+    // agrupar as linhas (já ordenadas) por cor
+    const grupos=[];
+    rows.forEach(r=>{ let g=grupos[grupos.length-1]; if(!g||g.cor!==r.cor){g={cor:r.cor,rows:[]};grupos.push(g);} g.rows.push(r); });
+    grupos.forEach(g=>{
+      const hex=prodHex(g.cor);
+      const qcolor=g.rows.reduce((s,r)=>s+Object.values(r.st).reduce((a,c)=>a+c.q,0),0);
+      const dist=D.stages.map(s=>{
+        let v=0; g.rows.forEach(r=>{ if(r.st[s]) v+=r.st[s].q; });
+        return v? `<i style="width:${(v/qcolor*100).toFixed(1)}%;background:${STCOLORS[s]||'#2563eb'}" title="${s}: ${v}"></i>`:'';
+      }).join("");
+      const hr=document.createElement("tr"); hr.className="pcolor";
+      hr.innerHTML=`<td colspan="${ncol}" style="border-left:6px solid ${hex}">
+        <div class="ch"><span class="sw2" style="background:${hex}"></span>
+        <span class="cnm">${g.cor}</span><span class="cpr">· ${p.nome}</span>
+        <span class="cst">${qcolor.toLocaleString('pt-BR')} peças <span class="pminibar">${dist}</span></span></div></td>`;
+      tb.appendChild(hr);
+      const gtr=document.createElement("tr"); gtr.className="pgrade";
+      gtr.innerHTML=`<td colspan="${ncol}">${gradeBlock(p.nome,g)}</td>`;
+      tb.appendChild(gtr);
+      g.rows.forEach(r=>{
+        let tot=0;
+        const cells=D.stages.map(s=>{
+          const c=r.st[s];
+          if(!c) return `<td>·</td>`;
+          tot+=c.q;
+          const id=PTIP.length; PTIP.push({prod:p.nome,cor:r.cor,tam:r.tam,stage:s,f:c.f});
+          return `<td class="pcell has" data-tip="${id}">${c.q.toLocaleString('pt-BR')}</td>`;
+        }).join("");
+        const cm=consumoVenda(p.nome,r.cor,r.tam);
+        const sku=prodSku(p.nome,r.cor,r.tam);
+        const nota=notaProducao(tot,cm);
+        const title=cm!=null?`${sku} · Venda mensal (C. Mensal): ${cm.toLocaleString('pt-BR')} un`:'Sem SKU de venda equivalente';
+        const skuLabel=sku?`<b style="font-family:ui-monospace,Menlo,Consolas,monospace">${sku}</b>`:`tam ${r.tam} <span class="note">(sem SKU)</span>`;
+        const tr=document.createElement("tr");
+        tr.innerHTML=`<td class="l">${skuLabel}</td>${cells}<td><b>${tot.toLocaleString('pt-BR')}</b></td>`+
+          `<td class="l"><span class="npill ${nota.cls}" title="${title}">${nota.txt}</span></td>`;
+        tb.appendChild(tr);
+      });
+    });
+  });
+}
+
+// Tooltip de fichas
+(function(){
+  const tip=document.createElement("div"); tip.className="ptip"; document.body.appendChild(tip);
+  const tb=document.getElementById("ptbody");
+  tb.addEventListener("mouseover",e=>{
+    const el=e.target.closest(".pcell.has"); if(!el) return;
+    const d=PTIP[+el.dataset.tip]; if(!d) return;
+    const lines=d.f.map(f=>`<div class="ln"><span>Ficha ${f[0]} — ${f[1].toLocaleString('pt-BR')} un</span><span>${f[2]}</span></div>`).join("");
+    tip.innerHTML=`<b>${d.stage}</b><div style="opacity:.8;margin-bottom:4px">${d.cor} · ${d.tam}</div>${lines}`;
+    tip.style.display="block";
+  });
+  tb.addEventListener("mousemove",e=>{
+    let x=e.clientX+14, y=e.clientY+14;
+    const w=tip.offsetWidth,h=tip.offsetHeight;
+    if(x+w>innerWidth) x=e.clientX-w-14;
+    if(y+h>innerHeight) y=e.clientY-h-14;
+    tip.style.left=x+"px"; tip.style.top=y+"px";
+  });
+  tb.addEventListener("mouseout",e=>{ if(!e.relatedTarget||!e.relatedTarget.closest||!e.relatedTarget.closest(".pcell.has")) tip.style.display="none"; });
+})();
+document.getElementById("pq").addEventListener("input",renderProdBody);
+document.getElementById("showGrades").addEventListener("change",e=>{
+  document.getElementById("ptbl").classList.toggle("show-grades",e.target.checked);
+});
+
+// ================= IMPORTAÇÃO DE PLANILHAS CRUAS =================
+const IMPORT={domus:{},shopee:{},ml:{},saidas:{},prod:{}};
+function _norm(s){return String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}
+function _num(x){ if(x==null)return 0; if(typeof x==='number')return x; let s=String(x).trim(); if(s.includes(',')) s=s.replace(/\./g,'').replace(',','.'); const n=parseFloat(s); return isNaN(n)?0:n; }
+function _isSku(x){ return /^[A-Z][A-Z0-9.\-]+$/.test(String(x||'').trim()); }
+function findCols(rows,targets){
+  const res={}, scan=Math.min(rows.length,20);
+  for(const key in targets){
+    const alts=targets[key].map(_norm);
+    for(let r=0;r<scan&&res[key]==null;r++){const row=rows[r]||[];for(let c=0;c<row.length;c++){if(alts.includes(_norm(row[c]))){res[key]=c;break;}}}
+    for(let r=0;r<scan&&res[key]==null;r++){const row=rows[r]||[];for(let c=0;c<row.length;c++){const cell=_norm(row[c]);if(cell&&alts.some(a=>cell.includes(a))){res[key]=c;break;}}}
+  }
+  return res;
+}
+function readWB(file){return new Promise((res,rej)=>{ if(typeof XLSX==='undefined'){rej(new Error('leitor de Excel indisponível (abra o HTML no navegador)'));return;}
+  const fr=new FileReader(); fr.onload=e=>{try{res(XLSX.read(e.target.result,{type:'array'}));}catch(err){rej(err);}}; fr.onerror=()=>rej(new Error('falha ao ler arquivo')); fr.readAsArrayBuffer(file);});}
+function sheetRows(wb,name){const ws=(name&&wb.Sheets[name])?wb.Sheets[name]:wb.Sheets[wb.SheetNames[0]];return XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});}
+const PARSERS={
+  domus:wb=>{const rows=sheetRows(wb);const ci=findCols(rows,{sku:['sku','codigo'],disp:['disponivel']});if(ci.sku==null||ci.disp==null)throw new Error('colunas SKU/Disponível não achadas');const o={};for(const r of rows){const s=String(r[ci.sku]||'').trim();if(_isSku(s)&&s!=='SKU')o[s]=(o[s]||0)+_num(r[ci.disp]);}return o;},
+  shopee:wb=>{const rows=sheetRows(wb,wb.SheetNames.includes('Total')?'Total':null);const ci=findCols(rows,{sku:['seller sku id'],sell:['sellable'],pend:['pending asn inbound'],sold:['unitssoldinlast30days']});if(ci.sku==null)throw new Error('Seller SKU ID não achado');const o={};for(const r of rows){const s=String(r[ci.sku]||'').trim();if(_isSku(s))o[s]={sell:_num(r[ci.sell]),pend:_num(r[ci.pend]),sold:_num(r[ci.sold])};}return o;},
+  ml:wb=>{const rows=sheetRows(wb,wb.SheetNames.includes('Resumo')?'Resumo':null);const ci=findCols(rows,{sku:['sku'],sold:['vendas ultimos 30 dias (un.)','vendas ultimos 30 dias (un)'],pend:['entrada pendente'],aptas:['aptas para venda']});if(ci.sku==null)throw new Error('SKU não achado no ML');const o={};for(const r of rows){const s=String(r[ci.sku]||'').trim();if(_isSku(s)&&s!=='SKU')o[s]={aptas:_num(r[ci.aptas]),pend:_num(r[ci.pend]),sold:_num(r[ci.sold])};}return o;},
+  saidas:wb=>{const rows=sheetRows(wb);const ci=findCols(rows,{sku:['sku'],qtd:['quantidade']});if(ci.sku==null||ci.qtd==null)throw new Error('colunas SKU/Quantidade não achadas');const o={};for(const r of rows){const s=String(r[ci.sku]||'').trim();if(_isSku(s)&&s!=='SKU')o[s]=(o[s]||0)+_num(r[ci.qtd]);}return o;},
+  prod:wb=>{const rows=sheetRows(wb);const ci=findCols(rows,{sku:['codigo de barras interno'],disp:['quantidade total disponivel'],prod:['quantidade total producao']});if(ci.sku==null)throw new Error('Código de barras interno não achado');const o={};for(const r of rows){const s=String(r[ci.sku]||'').trim();if(_isSku(s)){const x=o[s]||{disp:0,prod:0};x.disp+=_num(r[ci.disp]);x.prod+=_num(r[ci.prod]);o[s]=x;}}return o;}
+};
+document.querySelectorAll('#p-importar input[type=file]').forEach(inp=>{
+  inp.addEventListener('change',async e=>{
+    const src=inp.dataset.src,file=e.target.files[0];if(!file)return;
+    const st=document.getElementById('st-'+src);st.className='impst';st.textContent='lendo…';
+    try{const wb=await readWB(file);const d=PARSERS[src](wb);
+      if(!Object.keys(d).length) throw new Error('nenhum SKU lido');
+      IMPORT[src]=d;st.className='impst ok';st.textContent='✓ '+Object.keys(d).length+' SKUs lidos';}
+    catch(err){st.className='impst err';st.textContent='✗ '+err.message+(src==='ml'?' — abra o arquivo no Excel/Sheets e use "Salvar como → .xlsx" (ou exporte em CSV) e suba de novo':'');}
+  });
+});
+function famForSku(sku){const f=FAMILIES.find(F=>sku.startsWith(F.pref));if(f)return f.nome;return 'Outros · '+sku.replace(/-\d+[A-Z]*$/,'').replace(/-$/,'');}
+// aplica um conjunto consolidado de SKUs (do import manual OU do Drive) à Visão Geral
+function applyStockData(arr,persistState){
+  DATA=arr.map(x=>{
+    const brk = (x.shopee!=null||x.ml!=null||x.transito!=null); // tem detalhamento por canal?
+    const shopee = brk?Math.round(x.shopee||0):null;
+    const mlv    = brk?Math.round(x.ml||0):null;
+    const transito=brk?Math.round(x.transito||0):null;
+    // dfull = Full Shopee + Full ML + Em trânsito (complementar à Domuslog, sem dupla contagem)
+    const dfull = x.dfull!=null?Math.round(x.dfull):((shopee||0)+(mlv||0)+(transito||0));
+    const hasC = (x.cmDomus!=null||x.cmShopee!=null||x.cmMl!=null);
+    return {sku:x.sku,fam:x.fam||famForSku(x.sku),dom:Math.round(x.dom||0),
+            shopee,ml:mlv,transito,dfull,
+            cmDomus:hasC?Math.round(x.cmDomus||0):null,
+            cmShopee:hasC?Math.round(x.cmShopee||0):null,
+            cmMl:hasC?Math.round(x.cmMl||0):null,
+            pe:Math.round(x.pe||0),prod:Math.round(x.prod||0),cmensal:Math.round(x.cmensal||0)};
+  });
+  saidasMap=null;initFamCfg(false);
+  if(persistState!==false)persist();
+  renderTable();renderProdBody();
+}
+document.getElementById('consolidar').addEventListener('click',()=>{
+  const skus=new Set();Object.values(IMPORT).forEach(o=>Object.keys(o).forEach(s=>skus.add(s)));
+  if(!skus.size){alert('Suba ao menos uma planilha antes de consolidar.');return;}
+  const nd=[];
+  skus.forEach(sku=>{
+    const dom=IMPORT.domus[sku]||0,sh=IMPORT.shopee[sku]||{},mlSrc=IMPORT.ml[sku]||{},pr=IMPORT.prod[sku]||{};
+    const shopee=sh.sell||0, mlQ=mlSrc.aptas||0, transito=(sh.pend||0)+(mlSrc.pend||0);
+    const cmDomus=IMPORT.saidas[sku]||0, cmShopee=sh.sold||0, cmMl=mlSrc.sold||0;
+    nd.push({sku,dom,shopee,ml:mlQ,transito,dfull:shopee+mlQ+transito,cmDomus,cmShopee,cmMl,pe:pr.disp||0,prod:pr.prod||0,cmensal:cmDomus+cmShopee+cmMl});
+  });
+  applyStockData(nd);
+  document.getElementById('impResumo').textContent=nd.length+' SKUs consolidados (manual — só nesta sessão).';
+  go('visao');
+});
+// ---- Visão real: pasta do Google Drive via Netlify Function ----
+function driveEndpoint(){
+  try{ const o=localStorage.getItem('uz_drive_url'); if(o) return o.replace(/\/+$/,''); }catch(e){}
+  return '/.netlify/functions/drive';
+}
+async function loadFromDrive(silent){
+  const st=document.getElementById('driveStatus');
+  const ep=driveEndpoint();
+  if(st){st.className='impst';st.textContent='consultando o Drive…';}
+  try{
+    let r;
+    try{ r=await fetch(ep,{cache:'no-store'}); }
+    catch(net){ throw new Error('__NET__'); } // erro de rede (endpoint inacessível)
+    if(!r.ok){ let t=''; try{t=(await r.text()).slice(0,140);}catch(e){} throw new Error('HTTP '+r.status+(t?' — '+t:'')); }
+    const j=await r.json();
+    if(j.error)throw new Error(j.error);
+    if(!j.data||!j.data.length)throw new Error('a função respondeu, mas a pasta não retornou dados (confira o compartilhamento da pasta e os arquivos).');
+    applyStockData(j.data);
+    const when=j.updated?new Date(j.updated).toLocaleString('pt-BR'):'agora';
+    if(st){st.className='impst ok';st.textContent='✓ '+j.data.length+' SKUs · atualizado '+when;}
+    const badge=document.getElementById('driveBadge');
+    if(badge){badge.style.display='inline-flex';badge.textContent='● Visão real · '+when;}
+    if(!silent){document.getElementById('impResumo').textContent='Visão real carregada do Drive ('+j.data.length+' SKUs).';go('visao');}
+  }catch(err){
+    if(!st)return;
+    st.className='impst err';
+    if(err.message==='__NET__'){
+      const local=/^\/\.netlify/.test(ep);
+      st.innerHTML='✗ não consegui falar com a função do Drive'+(local?' neste endereço.':' ('+ep+').')+
+        ' Isso é normal na pré-visualização, ao abrir o arquivo localmente, ou se o site ainda não foi publicado. '+
+        'No app publicado no Netlify funciona direto; para testar aqui, informe a URL da função publicada no ⚙️ abaixo.';
+    } else {
+      st.textContent='✗ '+err.message;
+    }
+  }
+}
+{const b=document.getElementById('loadDrive');if(b)b.onclick=()=>loadFromDrive(false);}
+{const b=document.getElementById('driveCfg');if(b)b.onclick=()=>{
+  let cur=''; try{cur=localStorage.getItem('uz_drive_url')||'';}catch(e){}
+  const v=prompt('URL da função do Drive publicada (deixe em branco para usar o padrão do próprio site):\n\nex.: https://urban-controle-producao.netlify.app/.netlify/functions/drive', cur);
+  if(v===null)return;
+  try{ if(v.trim()) localStorage.setItem('uz_drive_url',v.trim()); else localStorage.removeItem('uz_drive_url'); }catch(e){}
+  loadFromDrive(false);
+};}
+document.getElementById('resetImport').addEventListener('click',()=>{
+  for(const k in IMPORT)IMPORT[k]={};
+  document.querySelectorAll('#p-importar .impst').forEach(s=>{s.className='impst';s.textContent='';});
+  document.querySelectorAll('#p-importar input[type=file]').forEach(i=>i.value='');
+  document.getElementById('impResumo').textContent='Importação limpa.';
+});
+setTimeout(()=>{if(typeof XLSX==='undefined'){const w=document.getElementById('xlsxWarn');if(w)w.style.display='inline';}},1500);
+
+// ---------- Init ----------
+if(!restore()) seed();
+renderFormulas();
+renderProducao();
+renderTable();
+// No site publicado, tenta carregar a visão real do Drive automaticamente (silencioso; cai no exemplo se não configurado)
+if(location.protocol==='https:'||location.protocol==='http:') loadFromDrive(true);
+</script>
+</body>
+</html>

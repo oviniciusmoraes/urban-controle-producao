@@ -1,0 +1,10 @@
+{
+  "name": "urban-controle-producao",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Painel de estoque e produção da Urban Zone Jeans — visão real via Google Drive + importação manual.",
+  "dependencies": {
+    "googleapis": "^144.0.0",
+    "xlsx": "^0.18.5"
+  }
+}
