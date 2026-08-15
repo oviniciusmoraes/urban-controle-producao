@@ -190,6 +190,11 @@ tr.egrouphead th.ch-dom{background:#12305e}
 tr.egrouphead th.ch-ml{background:#5a4310}
 #etbl thead th.ch-dom{color:#93c5fd}
 #etbl thead th.ch-ml{color:#fcd34d}
+tr.egrouphead th.ch-prod{background:#134e2e}
+#etbl thead th.ch-prod{color:#86efac}
+#etbl td.exptog{cursor:pointer;color:#16a34a;font-weight:900;text-align:center;width:24px;user-select:none}
+#etbl td.prodcell{font-weight:800;color:#166534;background:#f0fdf4}
+#etbl td.pecell{font-weight:800;color:#0f172a;background:#fffbeb}
 </style>
 </head>
 <body>
@@ -257,16 +262,13 @@ tr.egrouphead th.ch-ml{background:#5a4310}
         <option value="">Todos</option>
         <option value="need">Só quem precisa enviar</option>
       </select>
-      <span class="note">Canais de envio: <b>Domuslog</b> (Domuslog + Full Shopee somados) e <b>Full Mercado Livre</b>. Cada canal cobre a própria venda pelo tempo de estoque desejado.</span>
+      <label class="chkdet"><input type="checkbox" id="showProd"> 🏭 Mostrar produção e Pernambuco</label>
+      <span class="note">Canais: <b>Domuslog</b> (Domuslog + Full Shopee) e <b>Full Mercado Livre</b>. O envio possível é limitado pelo disponível no <b>Pernambuco (Estq PE)</b>.</span>
     </div>
     <div class="card scroll" style="margin-top:6px">
       <table id="etbl">
         <thead>
-          <tr class="egrouphead">
-            <th></th><th></th>
-            <th colspan="3" class="ch-dom">DOMUSLOG (+ Full Shopee)</th>
-            <th colspan="3" class="ch-ml">FULL MERCADO LIVRE</th>
-          </tr>
+          <tr class="egrouphead" id="egrouphead"></tr>
           <tr id="ethead"></tr>
         </thead>
         <tbody id="etbody"></tbody>
@@ -512,6 +514,8 @@ const COLS_DET = [
   {k:"shopee",t:"Est. Full Shopee"},
   {k:"ml",t:"Est. Full ML"},
   {k:"transito",t:"Est. Em trânsito"},
+  {k:"pe",t:"Pernambuco disp."},
+  {k:"prod",t:"Em produção"},
   {k:"cmensal",t:"Consumo total"},
   {k:"cmDomus",t:"Cons. Domuslog"},
   {k:"cmShopee",t:"Cons. Shopee"},
@@ -670,9 +674,40 @@ function envCell(ch,key){
   if(v<=0) return `<td class="env-off" title="Nada a enviar (estoque do canal já no ideal)">·</td>`;
   return `<td class="env-send">${fmt(v)}</td>`;
 }
+// mapa SKU -> produção por estágio (a partir do relatório Dapic embutido em PROD_DATA)
+let PROD_BY_SKU=null;
+function prodBySku(){
+  if(PROD_BY_SKU) return PROD_BY_SKU;
+  PROD_BY_SKU={};
+  try{
+    if(typeof PROD_DATA!=='undefined' && PROD_DATA && PROD_DATA.products){
+      PROD_DATA.products.forEach(p=>p.rows.forEach(r=>{
+        const sku=prodSku(p.nome,r.cor,r.tam); if(!sku) return;
+        const acc=PROD_BY_SKU[sku]||{stages:{},total:0};
+        for(const st in r.st){ acc.stages[st]=(acc.stages[st]||0)+r.st[st].q; acc.total+=r.st[st].q; }
+        PROD_BY_SKU[sku]=acc;
+      }));
+    }
+  }catch(e){}
+  return PROD_BY_SKU;
+}
+function stageChips(pb){
+  const order=(typeof PROD_DATA!=='undefined'&&PROD_DATA.stages)?PROD_DATA.stages:Object.keys(pb.stages);
+  const chips=order.filter(s=>pb.stages[s]).map(s=>`<span class="chip"><b>${fmt(pb.stages[s])}</b> ${s}</span>`).join('');
+  return `<div class="detbox"><div class="detline"><span class="detlab">🏭 Em produção por estágio · total ${fmt(pb.total)}</span>${chips}</div></div>`;
+}
 function renderEnvios(){
   const thead=document.getElementById("ethead"); if(!thead) return;
+  const showProd=document.getElementById("showProd")&&document.getElementById("showProd").checked;
+  const PB=showProd?prodBySku():null;
+  // cabeçalho de grupos
+  document.getElementById("egrouphead").innerHTML=`<th></th><th></th>`+
+    (showProd?`<th colspan="2" class="ch-prod">PRODUÇÃO / PERNAMBUCO</th>`:``)+
+    `<th colspan="3" class="ch-dom">DOMUSLOG (+ Full Shopee)</th>`+
+    `<th colspan="3" class="ch-ml">FULL MERCADO LIVRE</th>`;
+  // cabeçalho de colunas
   thead.innerHTML=`<th></th><th class="l" data-k="sku">SKU</th>`+
+    (showProd?`<th class="ch-prod">Em produção</th><th class="ch-prod">Pernambuco disp.</th>`:``)+
     ECOLS.map(c=>`<th class="ch-dom">${c.t}</th>`).join("")+
     ECOLS.map(c=>`<th class="ch-ml">${c.t}</th>`).join("");
   let rows=rowsComputed();
@@ -680,7 +715,6 @@ function renderEnvios(){
   const onlyNeed=document.getElementById("eStatus").value==='need';
   const filt=r=>(!q||r.sku.toLowerCase().includes(q)||r.fam.toLowerCase().includes(q))&&
     (!onlyNeed|| (r.chDom&&r.chDom.envP>0) || (r.chMl&&r.chMl.envP>0));
-  // KPIs de envio
   let posDom=0,posMl=0,needDom=0,needMl=0;
   rows.forEach(r=>{ if(r.chDom&&r.chDom.envP>0){posDom+=r.chDom.envP;needDom++;} if(r.chMl&&r.chMl.envP>0){posMl+=r.chMl.envP;needMl++;} });
   document.getElementById("ekpis").innerHTML=`
@@ -690,20 +724,35 @@ function renderEnvios(){
     <div class="kpi"><div class="n">${needMl}</div><div class="l">SKUs a repor · Full ML</div></div>`;
   const tb=document.getElementById("etbody"); tb.innerHTML="";
   const famOrder=[...FAMILIES.map(f=>f.nome)]; DATA.forEach(d=>{if(!famOrder.includes(d.fam))famOrder.push(d.fam);});
-  const ncol=2+ECOLS.length*2;
+  const ncol=2+(showProd?2:0)+ECOLS.length*2;
   famOrder.forEach(fam=>{
     let fr=rows.filter(r=>r.fam===fam).filter(filt);
     if(!fr.length) return;
+    fr.sort((a,b)=>sizeOf(a.sku)-sizeOf(b.sku));
     const cfg=FAMCFG[fam]||{hex:'#9ca3af'};
     const ftr=document.createElement("tr"); ftr.className="fam-row";
     ftr.innerHTML=`<td colspan="${ncol}" style="border-left:6px solid ${cfg.hex}"><div class="fam-head"><span class="sw2" style="background:${cfg.hex}"></span><span class="fam-name">${fam}</span></div></td>`;
     tb.appendChild(ftr);
     fr.forEach(r=>{
+      const pb=showProd?PB[r.sku]:null;
+      const hasStage=pb&&pb.total>0;
+      let lead;
+      if(showProd){
+        lead=`<td class="exptog" ${hasStage?`data-sku="${r.sku}"`:''}>${hasStage?'▸':''}</td>`+
+          `<td class="l"><b style="font-family:ui-monospace,Menlo,Consolas,monospace">${r.sku}</b></td>`+
+          `<td class="prodcell">${fmt(r.prod||0)}</td>`+
+          `<td class="pecell">${fmt(r.pe||0)}</td>`;
+      }else{
+        lead=`<td></td><td class="l"><b style="font-family:ui-monospace,Menlo,Consolas,monospace">${r.sku}</b></td>`;
+      }
       const tr=document.createElement("tr");
-      tr.innerHTML=`<td></td><td class="l"><b style="font-family:ui-monospace,Menlo,Consolas,monospace">${r.sku}</b></td>`+
-        ECOLS.map(c=>envCell(r.chDom,c.k)).join("")+
-        ECOLS.map(c=>envCell(r.chMl,c.k)).join("");
+      tr.innerHTML=lead+ECOLS.map(c=>envCell(r.chDom,c.k)).join("")+ECOLS.map(c=>envCell(r.chMl,c.k)).join("");
       tb.appendChild(tr);
+      if(hasStage){
+        const dr=document.createElement("tr"); dr.className="detrow";
+        dr.innerHTML=`<td colspan="${ncol}">${stageChips(pb)}</td>`;
+        tb.appendChild(dr);
+      }
     });
   });
 }
@@ -765,6 +814,12 @@ document.getElementById("q").addEventListener("input",renderTable);
 document.getElementById("fStatus").addEventListener("change",renderTable);
 document.getElementById("eq").addEventListener("input",renderEnvios);
 document.getElementById("eStatus").addEventListener("change",renderEnvios);
+document.getElementById("showProd").addEventListener("change",renderEnvios);
+document.getElementById("etbody").addEventListener("click",e=>{
+  const t=e.target.closest(".exptog"); if(!t||!t.dataset.sku) return;
+  const dr=t.closest("tr").nextElementSibling;
+  if(dr&&dr.classList.contains("detrow")){ const open=dr.classList.toggle("open"); t.textContent=open?"▾":"▸"; }
+});
 document.getElementById("applyAllSug").addEventListener("click",()=>{
   const famOrder=[...FAMILIES.map(f=>f.nome)];
   DATA.forEach(d=>{ if(!famOrder.includes(d.fam)) famOrder.push(d.fam); });
