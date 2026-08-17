@@ -366,7 +366,7 @@ tr.egrouphead th.ch-prod{background:#134e2e}
       <h3>Parâmetros de cálculo</h3>
       <div class="config-row">
         <label>Tempo de estoque desejado (dias)</label>
-        <input type="number" id="cfgTempo" value="20" min="1" style="width:90px">
+        <input type="number" id="cfgTempo" value="30" min="1" style="width:90px">
         <small class="hint">Abaixo disso → <b>VAI ACABAR</b>. Valor do topo da planilha.</small>
       </div>
       <div class="config-row">
@@ -432,7 +432,7 @@ function initFamCfg(reset){
 }
 
 // ---------- Estado ----------
-let CFG = {tempo:20, mult:1.5, metros:1.0};
+let CFG = {tempo:30, mult:1.5, metros:1.0};
 let DATA = [];      // {sku, fam, cresc, dfull, dom, pe, prod, cmensal}
 let saidasMap = null; // sku -> consumo (sobrescreve cmensal)
 let sortKey = null, sortDir = 1;
@@ -482,8 +482,9 @@ function compute(d){
   const hasCons = (d.cmDomus!=null||d.cmShopee!=null||d.cmMl!=null);
   const consDom = hasCons ? (d.cmDomus||0)+(d.cmShopee||0) : null; // Domuslog + Full Shopee
   const consMl  = hasCons ? (d.cmMl||0) : null;
-  const estDom  = (d.dom||0)+(d.shopee||0);   // estoque Domuslog + Full Shopee
-  const estMl   = (d.ml||0);                  // estoque Full ML
+  // estoque efetivo p/ envio: estoque atual do canal + o que já está a caminho dele
+  const estDom  = (d.dom||0)+(d.shopee||0)+(d.transitoDom||0);   // Domuslog + Full Shopee + a caminho
+  const estMl   = (d.ml||0)+(d.transitoMl||0);                   // Full ML + a caminho
   const idealDom = consDom!=null?Math.round(consDom/30*CFG.tempo):null;
   const idealMl  = consMl!=null?Math.round(consMl/30*CFG.tempo):null;
   const eiDom = idealDom!=null? idealDom-estDom : null;  // envio ideal Domuslog
@@ -665,13 +666,13 @@ function renderTable(){
 
 // ================= ENVIOS (por canal) =================
 const ECOLS=[
-  {k:"est",t:"Est. Ideal"},{k:"envI",t:"Envio Ideal"},{k:"envP",t:"Envio Possível"}
+  {k:"ideal",t:"Est. Ideal"},{k:"envI",t:"Envio Ideal"},{k:"envP",t:"Envio Possível"}
 ];
 function envCell(ch,key){
   if(!ch) return `<td class="nobrk">—</td>`;
   const v=ch[key];
-  if(key==="est") return `<td>${fmt(v)}</td>`;
-  if(v<=0) return `<td class="env-off" title="Nada a enviar (estoque do canal já no ideal)">·</td>`;
+  if(key==="ideal") return `<td>${fmt(v)}</td>`;   // estoque ideal = consumo do canal p/ o período
+  if(v<=0) return `<td class="env-off" title="Nada a enviar (estoque do canal já cobre o ideal)">·</td>`;
   return `<td class="env-send">${fmt(v)}</td>`;
 }
 // mapa SKU -> produção por estágio (a partir do relatório Dapic embutido em PROD_DATA)
@@ -834,7 +835,7 @@ document.getElementById("thead").addEventListener("click",e=>{
 document.getElementById("detView").addEventListener("change",renderTable);
 
 // ---------- Persistência (opcional) ----------
-const SEED_VERSION=3; // muda quando o seed de famílias é atualizado (invalida estado salvo antigo)
+const SEED_VERSION=4; // muda quando o seed de famílias é atualizado (invalida estado salvo antigo)
 function persist(){
   try{ localStorage.setItem("uz_state", JSON.stringify({v:SEED_VERSION,CFG,DATA,saidasMap,FAMCFG})); }catch(e){}
 }
@@ -1083,8 +1084,8 @@ function readWB(file){return new Promise((res,rej)=>{ if(typeof XLSX==='undefine
   const fr=new FileReader(); fr.onload=e=>{try{res(XLSX.read(e.target.result,{type:'array'}));}catch(err){rej(err);}}; fr.onerror=()=>rej(new Error('falha ao ler arquivo')); fr.readAsArrayBuffer(file);});}
 function sheetRows(wb,name){const ws=(name&&wb.Sheets[name])?wb.Sheets[name]:wb.Sheets[wb.SheetNames[0]];return XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});}
 const PARSERS={
-  domus:wb=>{const rows=sheetRows(wb);const ci=findCols(rows,{sku:['sku','codigo'],disp:['disponivel']});if(ci.sku==null||ci.disp==null)throw new Error('colunas SKU/Disponível não achadas');const o={};for(const r of rows){const s=String(r[ci.sku]||'').trim();if(_isSku(s)&&s!=='SKU')o[s]=(o[s]||0)+_num(r[ci.disp]);}return o;},
-  shopee:wb=>{const rows=sheetRows(wb,wb.SheetNames.includes('Total')?'Total':null);const ci=findCols(rows,{sku:['seller sku id'],sell:['sellable'],res:['reserved'],pend:['pending asn inbound'],sold:['unitssoldinlast30days']});if(ci.sku==null)throw new Error('Seller SKU ID não achado');const o={};for(const r of rows){const s=String(r[ci.sku]||'').trim();if(!_isSku(s))continue;const x=o[s]||{sell:0,pend:0,sold:0};x.sell+=_num(r[ci.pend])+_num(r[ci.sell])+_num(r[ci.res]);x.sold+=_num(r[ci.sold]);o[s]=x;}return o;},
+  domus:wb=>{const rows=sheetRows(wb);const ci=findCols(rows,{sku:['sku','codigo'],disp:['disponivel'],trans:['em transito']});if(ci.sku==null||ci.disp==null)throw new Error('colunas SKU/Disponível não achadas');const o={};for(const r of rows){const s=String(r[ci.sku]||'').trim();if(_isSku(s)&&s!=='SKU'){const x=o[s]||{disp:0,trans:0};x.disp+=_num(r[ci.disp]);x.trans+=_num(r[ci.trans]);o[s]=x;}}return o;},
+  shopee:wb=>{const rows=sheetRows(wb,wb.SheetNames.includes('Total')?'Total':null);const ci=findCols(rows,{sku:['seller sku id'],sell:['sellable'],res:['reserved'],pend:['pending asn inbound'],sold:['unitssoldinlast30days']});if(ci.sku==null)throw new Error('Seller SKU ID não achado');const o={};for(const r of rows){const s=String(r[ci.sku]||'').trim();if(!_isSku(s))continue;const x=o[s]||{sell:0,pend:0,sold:0};x.sell+=_num(r[ci.sell])+_num(r[ci.res]);x.pend+=_num(r[ci.pend]);x.sold+=_num(r[ci.sold]);o[s]=x;}return o;},
   ml:wb=>{const rows=sheetRows(wb,wb.SheetNames.includes('Resumo')?'Resumo':null);const ci=findCols(rows,{sku:['sku'],sold:['vendas ultimos 30 dias (un.)','vendas ultimos 30 dias (un)'],pend:['entrada pendente'],aptas:['aptas para venda']});if(ci.sku==null)throw new Error('SKU não achado no ML');const o={};for(const r of rows){const s=String(r[ci.sku]||'').trim();if(_isSku(s)&&s!=='SKU'){const x=o[s]||{aptas:0,pend:0,sold:0};x.aptas+=_num(r[ci.aptas]);x.pend+=_num(r[ci.pend]);x.sold+=_num(r[ci.sold]);o[s]=x;}}return o;},
   saidas:wb=>{const rows=sheetRows(wb);const ci=findCols(rows,{sku:['sku'],qtd:['quantidade']});if(ci.sku==null||ci.qtd==null)throw new Error('colunas SKU/Quantidade não achadas');const o={};for(const r of rows){const s=String(r[ci.sku]||'').trim();if(_isSku(s)&&s!=='SKU')o[s]=(o[s]||0)+_num(r[ci.qtd]);}return o;},
   prod:wb=>{const rows=sheetRows(wb);const ci=findCols(rows,{sku:['codigo de barras interno'],disp:['quantidade total disponivel'],prod:['quantidade total producao']});if(ci.sku==null)throw new Error('Código de barras interno não achado');const o={};for(const r of rows){const s=String(r[ci.sku]||'').trim();if(_isSku(s)){const x=o[s]||{disp:0,prod:0};x.disp+=_num(r[ci.disp]);x.prod+=_num(r[ci.prod]);o[s]=x;}}return o;}
@@ -1111,7 +1112,10 @@ function applyStockData(arr,persistState){
     const dfull = x.dfull!=null?Math.round(x.dfull):((shopee||0)+(mlv||0)+(transito||0));
     const hasC = (x.cmDomus!=null||x.cmShopee!=null||x.cmMl!=null);
     return {sku:x.sku,fam:x.fam||famForSku(x.sku),dom:Math.round(x.dom||0),
-            shopee,ml:mlv,transito,dfull,
+            shopee,ml:mlv,transito,
+            transitoDom:brk?Math.round(x.transitoDom||0):null,
+            transitoMl:brk?Math.round(x.transitoMl||0):null,
+            dfull,
             cmDomus:hasC?Math.round(x.cmDomus||0):null,
             cmShopee:hasC?Math.round(x.cmShopee||0):null,
             cmMl:hasC?Math.round(x.cmMl||0):null,
@@ -1126,10 +1130,14 @@ document.getElementById('consolidar').addEventListener('click',()=>{
   if(!skus.size){alert('Suba ao menos uma planilha antes de consolidar.');return;}
   const nd=[];
   skus.forEach(sku=>{
-    const dom=IMPORT.domus[sku]||0,sh=IMPORT.shopee[sku]||{},mlSrc=IMPORT.ml[sku]||{},pr=IMPORT.prod[sku]||{};
-    const shopee=sh.sell||0, mlQ=mlSrc.aptas||0, transito=(sh.pend||0)+(mlSrc.pend||0);
+    const dm=IMPORT.domus[sku]||{}, dom=dm.disp||0, domTrans=dm.trans||0;
+    const sh=IMPORT.shopee[sku]||{},mlSrc=IMPORT.ml[sku]||{},pr=IMPORT.prod[sku]||{};
+    const shopee=sh.sell||0, mlQ=mlSrc.aptas||0;
+    const transitoDom=domTrans+(sh.pend||0);   // a caminho da Domuslog: inventário Stokki + Pending ASN Shopee
+    const transitoMl=mlSrc.pend||0;             // a caminho do ML: Entrada pendente
+    const transito=transitoDom+transitoMl;
     const cmDomus=IMPORT.saidas[sku]||0, cmShopee=sh.sold||0, cmMl=mlSrc.sold||0;
-    nd.push({sku,dom,shopee,ml:mlQ,transito,dfull:shopee+mlQ+transito,cmDomus,cmShopee,cmMl,pe:pr.disp||0,prod:pr.prod||0,cmensal:cmDomus+cmShopee+cmMl});
+    nd.push({sku,dom,shopee,ml:mlQ,transitoDom,transitoMl,transito,dfull:shopee+mlQ+transito,cmDomus,cmShopee,cmMl,pe:pr.disp||0,prod:pr.prod||0,cmensal:cmDomus+cmShopee+cmMl});
   });
   applyStockData(nd);
   document.getElementById('impResumo').textContent=nd.length+' SKUs consolidados (manual — só nesta sessão).';
