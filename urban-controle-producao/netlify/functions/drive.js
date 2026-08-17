@@ -48,8 +48,8 @@ function classify(rows) {
 }
 
 const EXTRACT = {
-  domus: rows => { const ci = findCols(rows, { sku: ['sku', 'codigo'], disp: ['disponivel'] }); const o = {}; if (ci.sku == null || ci.disp == null) return o; for (const r of rows) { const s = String(r[ci.sku] || '').trim(); if (_isSku(s) && s !== 'SKU') o[s] = (o[s] || 0) + _num(r[ci.disp]); } return o; },
-  shopee: rows => { const ci = findCols(rows, { sku: ['seller sku id'], sell: ['sellable'], res: ['reserved'], pend: ['pending asn inbound'], sold: ['unitssoldinlast30days'] }); const o = {}; if (ci.sku == null) return o; for (const r of rows) { const s = String(r[ci.sku] || '').trim(); if (!_isSku(s)) continue; const x = o[s] || { sell: 0, pend: 0, sold: 0 }; x.sell += _num(r[ci.pend]) + _num(r[ci.sell]) + _num(r[ci.res]); x.sold += _num(r[ci.sold]); o[s] = x; } return o; },
+  domus: rows => { const ci = findCols(rows, { sku: ['sku', 'codigo'], disp: ['disponivel'], trans: ['em transito'] }); const o = {}; if (ci.sku == null || ci.disp == null) return o; for (const r of rows) { const s = String(r[ci.sku] || '').trim(); if (_isSku(s) && s !== 'SKU') { const x = o[s] || { disp: 0, trans: 0 }; x.disp += _num(r[ci.disp]); x.trans += _num(r[ci.trans]); o[s] = x; } } return o; },
+  shopee: rows => { const ci = findCols(rows, { sku: ['seller sku id'], sell: ['sellable'], res: ['reserved'], pend: ['pending asn inbound'], sold: ['unitssoldinlast30days'] }); const o = {}; if (ci.sku == null) return o; for (const r of rows) { const s = String(r[ci.sku] || '').trim(); if (!_isSku(s)) continue; const x = o[s] || { sell: 0, pend: 0, sold: 0 }; x.sell += _num(r[ci.sell]) + _num(r[ci.res]); x.pend += _num(r[ci.pend]); x.sold += _num(r[ci.sold]); o[s] = x; } return o; },
   ml: rows => { const ci = findCols(rows, { sku: ['sku'], sold: ['vendas ultimos 30 dias (un.)', 'vendas ultimos 30 dias (un)'], pend: ['entrada pendente'], aptas: ['aptas para venda'] }); const o = {}; if (ci.sku == null) return o; for (const r of rows) { const s = String(r[ci.sku] || '').trim(); if (_isSku(s) && s !== 'SKU') { const x = o[s] || { aptas: 0, pend: 0, sold: 0 }; x.aptas += _num(r[ci.aptas]); x.pend += _num(r[ci.pend]); x.sold += _num(r[ci.sold]); o[s] = x; } } return o; },
   saidas: rows => { const ci = findCols(rows, { sku: ['sku'], qtd: ['quantidade'] }); const o = {}; if (ci.sku == null || ci.qtd == null) return o; for (const r of rows) { const s = String(r[ci.sku] || '').trim(); if (_isSku(s) && s !== 'SKU') o[s] = (o[s] || 0) + _num(r[ci.qtd]); } return o; },
   prod: rows => { const ci = findCols(rows, { sku: ['codigo de barras interno'], disp: ['quantidade total disponivel'], prod: ['quantidade total producao'] }); const o = {}; if (ci.sku == null) return o; for (const r of rows) { const s = String(r[ci.sku] || '').trim(); if (_isSku(s)) { const x = o[s] || { disp: 0, prod: 0 }; x.disp += _num(r[ci.disp]); x.prod += _num(r[ci.prod]); o[s] = x; } } return o; }
@@ -133,10 +133,13 @@ exports.handler = async (event) => {
     Object.values(sources).forEach(o => Object.keys(o).forEach(s => skus.add(s)));
     const data = [];
     skus.forEach(sku => {
-      const dom = sources.domus[sku] || 0, sh = sources.shopee[sku] || {}, mlSrc = sources.ml[sku] || {}, pr = sources.prod[sku] || {};
-      const shopee = sh.sell || 0;                       // Full Shopee (Sellable)
+      const dm = sources.domus[sku] || {}, dom = dm.disp || 0, domTrans = dm.trans || 0;
+      const sh = sources.shopee[sku] || {}, mlSrc = sources.ml[sku] || {}, pr = sources.prod[sku] || {};
+      const shopee = sh.sell || 0;                       // Full Shopee (Sellable + Reserved)
       const mlQ = mlSrc.aptas || 0;                      // Full ML (Aptas para venda)
-      const transito = (sh.pend || 0) + (mlSrc.pend || 0); // Em trânsito (Pending ASN + Entrada pendente)
+      const transitoDom = domTrans + (sh.pend || 0);     // a caminho da Domuslog: inventário Stokki + Pending ASN Shopee
+      const transitoMl = mlSrc.pend || 0;                // a caminho do ML: Entrada pendente
+      const transito = transitoDom + transitoMl;
       const cmDomus = sources.saidas[sku] || 0, cmShopee = sh.sold || 0, cmMl = mlSrc.sold || 0;
       // dfull = Full Shopee + Full ML + Em trânsito (complementar à Domuslog — sem dupla contagem)
       data.push({
@@ -144,6 +147,8 @@ exports.handler = async (event) => {
         dom: Math.round(dom),
         shopee: Math.round(shopee),
         ml: Math.round(mlQ),
+        transitoDom: Math.round(transitoDom),
+        transitoMl: Math.round(transitoMl),
         transito: Math.round(transito),
         dfull: Math.round(shopee + mlQ + transito),
         cmDomus: Math.round(cmDomus), cmShopee: Math.round(cmShopee), cmMl: Math.round(cmMl),
