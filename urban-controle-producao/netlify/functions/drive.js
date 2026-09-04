@@ -50,7 +50,7 @@ function classify(rows) {
 const EXTRACT = {
   domus: rows => { const ci = findCols(rows, { sku: ['sku', 'codigo'], disp: ['disponivel'], trans: ['em transito'] }); const o = {}; if (ci.sku == null || ci.disp == null) return o; for (const r of rows) { const s = String(r[ci.sku] || '').trim(); if (_isSku(s) && s !== 'SKU') { const x = o[s] || { disp: 0, trans: 0 }; x.disp += _num(r[ci.disp]); x.trans += _num(r[ci.trans]); o[s] = x; } } return o; },
   shopee: rows => { const ci = findCols(rows, { sku: ['seller sku id'], sell: ['sellable'], res: ['reserved'], pend: ['pending asn inbound'], sold: ['unitssoldinlast30days'] }); const o = {}; if (ci.sku == null) return o; for (const r of rows) { const s = String(r[ci.sku] || '').trim(); if (!_isSku(s)) continue; const x = o[s] || { sell: 0, pend: 0, sold: 0 }; x.sell += _num(r[ci.sell]) + _num(r[ci.res]); x.pend += _num(r[ci.pend]); x.sold += _num(r[ci.sold]); o[s] = x; } return o; },
-  ml: rows => { const ci = findCols(rows, { sku: ['sku'], sold: ['vendas ultimos 30 dias (un.)', 'vendas ultimos 30 dias (un)'], pend: ['entrada pendente'], aptas: ['aptas para venda'] }); const o = {}; if (ci.sku == null) return o; for (const r of rows) { const s = String(r[ci.sku] || '').trim(); if (_isSku(s) && s !== 'SKU') { const x = o[s] || { aptas: 0, pend: 0, sold: 0 }; x.aptas += _num(r[ci.aptas]); x.pend += _num(r[ci.pend]); x.sold += _num(r[ci.sold]); o[s] = x; } } return o; },
+  ml: rows => { const ci = findCols(rows, { sku: ['sku'], sold: ['unidades vendidas ult. 30 dias', 'unidades vendidas ult 30 dias', 'unidades vendidas', 'vendas ultimos 30 dias (un.)', 'vendas ultimos 30 dias (un)'], pend: ['entrada pendente'], aptas: ['aptas para venda'] }); const o = {}; if (ci.sku == null) return o; for (const r of rows) { const s = String(r[ci.sku] || '').trim(); if (_isSku(s) && s !== 'SKU') { const x = o[s] || { aptas: 0, pend: 0, sold: 0 }; x.aptas += _num(r[ci.aptas]); x.pend += _num(r[ci.pend]); x.sold += _num(r[ci.sold]); o[s] = x; } } return o; },
   saidas: rows => { const ci = findCols(rows, { sku: ['sku'], qtd: ['quantidade'] }); const o = {}; if (ci.sku == null || ci.qtd == null) return o; for (const r of rows) { const s = String(r[ci.sku] || '').trim(); if (_isSku(s) && s !== 'SKU') o[s] = (o[s] || 0) + _num(r[ci.qtd]); } return o; },
   prod: rows => { const ci = findCols(rows, { sku: ['codigo de barras interno'], disp: ['quantidade total disponivel'], prod: ['quantidade total producao'] }); const o = {}; if (ci.sku == null) return o; for (const r of rows) { const s = String(r[ci.sku] || '').trim(); if (_isSku(s)) { const x = o[s] || { disp: 0, prod: 0 }; x.disp += _num(r[ci.disp]); x.prod += _num(r[ci.prod]); o[s] = x; } } return o; }
 };
@@ -148,6 +148,7 @@ exports.handler = async (event) => {
         shopee: Math.round(shopee),
         ml: Math.round(mlQ),
         transitoDom: Math.round(transitoDom),
+        transitoShopee: Math.round(sh.pend || 0),   // Pending ASN Shopee isolado (para a V2 recompor o trânsito)
         transitoMl: Math.round(transitoMl),
         transito: Math.round(transito),
         dfull: Math.round(shopee + mlQ + transito),
